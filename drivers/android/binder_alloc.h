@@ -31,16 +31,16 @@ struct binder_transaction;
  * struct binder_buffer - buffer used for binder transactions
  * @entry:              entry alloc->buffers
  * @rb_node:            node for allocated_buffers/free_buffers rb trees
- * @free:               true if buffer is free
- * @allow_user_free:    describe the second member of struct blah,
- * @async_transaction:  describe the second member of struct blah,
- * @debug_id:           describe the second member of struct blah,
- * @transaction:        describe the second member of struct blah,
- * @target_node:        describe the second member of struct blah,
- * @data_size:          describe the second member of struct blah,
- * @offsets_size:       describe the second member of struct blah,
- * @extra_buffers_size: describe the second member of struct blah,
- * @data:i              describe the second member of struct blah,
+ * @free:               %true if buffer is free
+ * @allow_user_free:    %true if user is allowed to free buffer
+ * @async_transaction:  %true if buffer is in use for an async txn
+ * @debug_id:           unique ID for debugging
+ * @transaction:        pointer to associated struct binder_transaction
+ * @target_node:        struct binder_node associated with this buffer
+ * @data_size:          size of @transaction data
+ * @offsets_size:       size of array of offsets
+ * @extra_buffers_size: size of space for other objects (like sg lists)
+ * @user_data:          user pointer to base of buffer space
  *
  * Bookkeeping structure for binder transaction buffers
  */
@@ -59,7 +59,7 @@ struct binder_buffer {
 	size_t data_size;
 	size_t offsets_size;
 	size_t extra_buffers_size;
-	void *data;
+	void __user *user_data;
 };
 
 /**
@@ -102,7 +102,7 @@ struct binder_alloc {
 	struct mutex mutex;
 	struct vm_area_struct *vma;
 	struct mm_struct *vma_vm_mm;
-	void *buffer;
+	void __user *buffer;
 	struct list_head buffers;
 	struct rb_root free_buffers;
 	struct rb_root allocated_buffers;
