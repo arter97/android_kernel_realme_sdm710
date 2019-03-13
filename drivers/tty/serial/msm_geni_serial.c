@@ -29,6 +29,9 @@
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
 
+/* Show PM related logs */
+//#define DEBUG_PM
+
 /* UART specific GENI registers */
 #define SE_UART_LOOPBACK_CFG		(0x22C)
 #define SE_UART_TX_TRANS_CFG		(0x25C)
@@ -308,10 +311,13 @@ static int vote_clock_on(struct uart_port *uport)
 		return ret;
 	}
 	port->ioctl_count++;
+
+#ifdef DEBUG_PM
 	dev_info(uport->dev,
 		"pid: %d, comm: %s voted clock to be on, "
 		"ioctl_count: %d\n",
 			current->pid, current->comm, port->ioctl_count);
+#endif
 
 	return 0;
 }
@@ -336,10 +342,13 @@ static int vote_clock_off(struct uart_port *uport)
 				__func__, port->ioctl_count);
 		port->ioctl_count = 0;
 	}
+
+#ifdef DEBUG_PM
 	dev_info(uport->dev,
 		"pid: %d, comm: %s voted clock to be off, "
 		"ioctl_count: %d\n",
 			current->pid, current->comm, port->ioctl_count);
+#endif
 	msm_geni_serial_power_off(uport);
 
 	return 0;
@@ -1413,8 +1422,10 @@ static irqreturn_t msm_geni_wakeup_isr(int isr, void *dev)
 		port->edge_count = 0;
 		tty_flip_buffer_push(tty->port);
 		__pm_wakeup_event(&port->geni_wake, WAKEBYTE_TIMEOUT_MSEC);
+#ifdef DEBUG_PM
 		dev_info(uport->dev, "%s: Holding wakelock for %d ms\n",
 					__func__, WAKEBYTE_TIMEOUT_MSEC);
+#endif
 	} else if (port->edge_count < 2) {
 		port->edge_count++;
 	}
