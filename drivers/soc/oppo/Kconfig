@@ -22,3 +22,9 @@ config OPPO_DEVICE_IFNO
 source "drivers/soc/oppo/oppo_project/Kconfig"
 
 source "drivers/soc/oppo/oppo_devinfo/Kconfig"
+
+source "drivers/soc/oppo/oppo_trace/Kconfig"
+
+source "drivers/soc/oppo/oppo_mdmrst/Kconfig"
+
+source "drivers/soc/oppo/oppo_hypnus/Kconfig"
