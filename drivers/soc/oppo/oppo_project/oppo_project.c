@@ -32,15 +32,6 @@ unsigned int get_project(void)
         return format->nproject;
 }
 
-unsigned int is_project(OPPO_PROJECT project)
-{
-        return (get_project() == project?1:0);
-}
-#ifdef VENDOR_EDIT
-/* Hui.Fan@PSW.BSP.OPPOFeature.Hypnus, 2017-7-17, export is_project */
-EXPORT_SYMBOL(is_project);
-#endif /* VENDOR_EDIT */
-
 unsigned char get_PCB_Version(void)
 {
         if (format == NULL) {
