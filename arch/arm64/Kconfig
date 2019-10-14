@@ -239,6 +239,7 @@ config NEED_DMA_MAP_STATE
 config NEED_SG_DMA_LENGTH
 	def_bool y
 
+
 config SMP
 	def_bool y
 

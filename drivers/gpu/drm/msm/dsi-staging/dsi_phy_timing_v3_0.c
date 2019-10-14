@@ -92,8 +92,14 @@ void dsi_phy_hw_v3_0_update_timing_params(
 	timing->lane_v3[6] = desc->hs_prepare.reg_value;
 	timing->lane_v3[7] = desc->hs_trail.reg_value;
 	timing->lane_v3[8] = desc->hs_rqst.reg_value;
+#ifdef VENDOR_EDIT
+/*liping-m@PSW.MM.Display.Lcd.Stability, 2018-12-04,add for solve esd fail phy error:0x1000820*/
+	timing->lane_v3[9] = 0x04;
+	timing->lane_v3[10] = 0x05;
+#else
 	timing->lane_v3[9] = 0x02;
 	timing->lane_v3[10] = 0x04;
+#endif /*VENDOR_EDIT*/
 	timing->lane_v3[11] = 0x00;
 
 	pr_debug("[%d %d %d %d]\n", timing->lane_v3[0],

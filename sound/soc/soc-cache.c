@@ -38,6 +38,10 @@ int snd_soc_cache_init(struct snd_soc_codec *codec)
 
 	return 0;
 }
+#ifdef VENDOR_EDIT
+/*Jianfeng.Qiu@PSW.MM.AudioDriver.Machine, 2018/04/26, Add for audio*/
+EXPORT_SYMBOL(snd_soc_cache_init);
+#endif /* VENDOR_EDIT */
 
 /*
  * NOTE: keep in mind that this function might be called

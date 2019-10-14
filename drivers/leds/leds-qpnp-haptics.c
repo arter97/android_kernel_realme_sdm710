@@ -320,6 +320,10 @@ struct hap_chip {
 	u16				base;
 	int				play_irq;
 	int				sc_irq;
+#ifdef VENDOR_EDIT
+//Added by wanghao@Bsp.group.Tp for vib min time setting,2018/5/17
+	int                             time_min;
+#endif/*VENDOR_EDIT*/
 	struct pwm_param		pwm_data;
 	struct hap_lra_ares_param	ares_cfg;
 	struct regulator		*vcc_pon;
@@ -755,6 +759,12 @@ static int qpnp_haptics_play(struct hap_chip *chip, bool enable)
 
 		if (chip->play_mode == HAP_BUFFER)
 			time_ms = get_buffer_mode_duration(chip);
+		#ifdef VENDOR_EDIT
+		//Added by wanghao@Bsp.group.Tp for vib min time setting,2018/5/17
+		time_ms = time_ms < chip->time_min ?
+		chip->time_min : time_ms;
+		pr_err("vib on = %d, enable is %d\n", time_ms, enable);
+		#endif/*VENDOR_EDIT*/
 		hrtimer_start(&chip->stop_timer,
 			ktime_set(time_ms / MSEC_PER_SEC,
 			(time_ms % MSEC_PER_SEC) * NSEC_PER_MSEC),
@@ -771,6 +781,10 @@ static int qpnp_haptics_play(struct hap_chip *chip, bool enable)
 				ktime_set(0, AUTO_RES_ERR_POLL_TIME_NS),
 				HRTIMER_MODE_REL);
 	} else {
+		#ifdef VENDOR_EDIT
+		//Added by wanghao@Bsp.group.Tp for vib min time setting,2018/5/17
+		pr_err("vib enable is %d\n", enable);
+		#endif/*VENDOR_EDIT*/
 		rc = qpnp_haptics_play_control(chip, HAP_STOP);
 		if (rc < 0) {
 			pr_err("Error in disabling play, rc=%d\n", rc);
@@ -2267,6 +2281,18 @@ static int qpnp_haptics_parse_dt(struct hap_chip *chip)
 			return rc;
 		}
 	}
+
+#ifdef VENDOR_EDIT
+//Added by wanghao@Bsp.group.Tp for vib min time setting,2018/5/17
+	rc = of_property_read_u32(node,
+			"qcom,vib-timemin-ms", &temp);
+	if (!rc) {
+		chip->time_min = temp;
+	} else if (rc != -EINVAL) {
+		pr_err("Unable to read vib time_min, rc = %d\n", rc);
+		chip->time_min = 0;
+	}
+#endif/*VENDOR_EDIT*/
 
 	/* Read the following properties only for LRA */
 	if (chip->act_type == HAP_LRA) {

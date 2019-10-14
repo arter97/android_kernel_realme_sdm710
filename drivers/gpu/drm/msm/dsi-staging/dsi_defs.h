@@ -244,6 +244,20 @@ enum dsi_dfps_type {
  * @DSI_CMD_SET_ROI:			   Panel ROI update
  * @DSI_CMD_SET_TIMING_SWITCH:             Timing switch
  * @DSI_CMD_SET_POST_TIMING_SWITCH:        Post timing switch
+#ifdef VENDOR_EDIT
+ * @liping-m@PSW.MM.Display.LCD.Stability,2018/12/14, add for lcd notes
+ * @DSI_CMD_POST_ON_BACKLIGHT:             Panel on cmd send for AOD and Fingerprint
+ * @DSI_CMD_AOD_ON:                        Panel AOD on cmd
+ * @DSI_CMD_AOD_OFF:                       Panel AOD off cmd
+ * @DSI_CMD_HBM_ON:                        Panel Fingerprint high brightness 670nit on cmd
+ * @DSI_CMD_HBM_OFF:                       Panel Fingerprint high brightness off cmd
+ * @DSI_CMD_AOD_HBM_ON:                    Panel AOD and Fingerprint high brightness  670nit on cmd
+ * @DSI_CMD_AOD_HBM_OFF:                   Panel AOD and Fingerprint high brightness off cmd
+ * @DSI_CMD_SEED_DCI_P3:                   Panel seed level 3 cmd
+ * @DSI_CMD_SEED_SRGB:                     Panel seed SRGB mode cmd
+ * @DSI_CMD_SEED_OFF:                      Panel seed off cmd
+ * @DSI_CMD_NORMAL_HBM_ON:                 Panel normal HBM 600nit on cmd
+#endif
  * @DSI_CMD_SET_MAX
  */
 enum dsi_cmd_set_type {
@@ -268,6 +282,22 @@ enum dsi_cmd_set_type {
 	DSI_CMD_SET_ROI,
 	DSI_CMD_SET_TIMING_SWITCH,
 	DSI_CMD_SET_POST_TIMING_SWITCH,
+#ifdef VENDOR_EDIT
+/* liping-m@PSW.MM.Display.LCD.Stability,2018/07/03, optimize screen on*/
+	DSI_CMD_POST_ON_BACKLIGHT,
+	DSI_CMD_AOD_ON,
+	DSI_CMD_AOD_OFF,
+	DSI_CMD_HBM_ON,
+	DSI_CMD_HBM_OFF,
+	DSI_CMD_AOD_HBM_ON,
+	DSI_CMD_AOD_HBM_OFF,
+	DSI_CMD_SEED_DCI_P3,
+	DSI_CMD_SEED_SRGB,
+	DSI_CMD_SEED_OFF,
+	DSI_CMD_NORMAL_HBM_ON,
+	DSI_CMD_AOD_HIGH_LIGHT_MODE,
+	DSI_CMD_AOD_LOW_LIGHT_MODE,
+#endif
 	DSI_CMD_SET_MAX
 };
 

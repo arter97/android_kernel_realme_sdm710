@@ -17,6 +17,60 @@
 #include <linux/clk.h>
 #include "dp_power.h"
 
+#ifdef VENDOR_EDIT
+/*liping-m@PSW.MM.Display.LCD.Feature,2018/9/26 add for dp support */
+#include <linux/module.h>
+int max20328_enable_displayport(bool enable, bool flip);
+int fsa4480_enable_sub_switch(bool enable, bool flip);
+bool max20328_chip_ready(void);
+static bool (*oppo_switch_chip_ready)(void);
+static int (*oppo_enable_sub_switch)(bool enable, bool flip);
+static int need_update_defer = false;
+static int oppo_sub_switch_enable_status = false;
+static int oppo_sub_switch_flip_status = false;
+
+
+bool oppo_dp_sub_switch_ready(void)
+{
+	if (!oppo_enable_sub_switch)
+		oppo_enable_sub_switch = symbol_request(fsa4480_enable_sub_switch);
+	if (!oppo_enable_sub_switch)
+		oppo_enable_sub_switch = symbol_request(max20328_enable_displayport);
+	if (!oppo_enable_sub_switch) {
+		pr_err("failed to found oppo_enable_sub_switch\n");
+		return false;
+	}
+
+	if (!oppo_switch_chip_ready)
+		oppo_switch_chip_ready = symbol_request(max20328_chip_ready);
+	if (!oppo_switch_chip_ready) {
+		pr_err("failed to found oppo_switch_chip_ready function\n");
+		return false;
+	}
+	if (oppo_switch_chip_ready && !oppo_switch_chip_ready()) {
+		pr_err("switch chips not ready\n");
+		return false;
+	}
+
+	return true;
+}
+
+int oppo_dp_sub_switch_status_update(void)
+{
+	if (!need_update_defer)
+		return 0;
+
+	if (!oppo_dp_sub_switch_ready() || !oppo_enable_sub_switch)
+		return -EINVAL;
+
+	need_update_defer = false;
+	oppo_enable_sub_switch(oppo_sub_switch_enable_status,
+			       oppo_sub_switch_flip_status);
+
+	return 0;
+}
+#endif /* VENDOR_EDIT */
+
 #define DP_CLIENT_NAME_SIZE	20
 
 struct dp_power_private {
@@ -402,10 +456,28 @@ static int dp_power_config_gpios(struct dp_power_private *power, bool flip,
 		dp_power_set_gpio(power, flip);
 	} else {
 		for (i = 0; i < mp->num_gpio; i++) {
+			#ifdef VENDOR_EDIT
+			/*liping-m@PSW.MM.Display.LCD.Stable,2018/9/26 fix dp gpio free warning */
+			if (!gpio_is_valid(config[i].gpio))
+				continue;
+			#endif /* VENDOR_EDIT */
 			gpio_set_value(config[i].gpio, 0);
 			gpio_free(config[i].gpio);
 		}
 	}
+
+#ifdef VENDOR_EDIT
+/*liping-m@PSW.MM.Display.LCD.Feature,2018/9/26 add for dp support */
+	if (oppo_dp_sub_switch_ready() && oppo_enable_sub_switch) {
+		oppo_enable_sub_switch(enable, flip);
+		need_update_defer = false;
+	} else {
+		oppo_sub_switch_flip_status = flip;
+		oppo_sub_switch_enable_status = enable;
+		need_update_defer = true;
+		pr_err("failed to found oppo_enable_sub_switch\n");
+	}
+#endif
 
 	return 0;
 }

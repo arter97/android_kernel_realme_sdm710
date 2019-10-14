@@ -298,6 +298,11 @@ int sde_plane_validate_multirect_v2(struct sde_multirect_plane_states *plane);
  */
 void sde_plane_clear_multirect(const struct drm_plane_state *drm_state);
 
+#ifdef VENDOR_EDIT
+/*liping-m@PSW.MM.Display.Service.Feature,2018/9/26,for OnScreenFingerprint feature*/
+int sde_plane_check_fingerprint_layer(const struct drm_plane_state *drm_state);
+#endif
+
 /**
  * sde_plane_wait_input_fence - wait for input fence object
  * @plane:   Pointer to DRM plane object
