@@ -157,11 +157,13 @@
 
 			qcom,chargerid_switch-gpio = <&tlmm 93 0x00>;
 			qcom,ship-gpio = <&tlmm 67 0x00>;
+			qcom,shortc-gpio = <&tlmm 43 0x00>;
 
 			//qcom,dischg-gpio = <&pm660l_gpios 7 0x00>;
 			pinctrl-names = "chargerid_switch_active", "chargerid_switch_sleep", "chargerid_switch_default",
 							"ship_active", "ship_sleep",
-							"chg_qupv3_se12_2uart_sleep", "chg_qupv3_se12_2uart_default";
+							"chg_qupv3_se12_2uart_sleep", "chg_qupv3_se12_2uart_default",
+							"shortc_active";
 							/*"dischg_enable", "dischg_disable",*/
 			pinctrl-0 = <&chargerid_switch_active>;
 			pinctrl-1 = <&chargerid_switch_sleep>;
@@ -170,6 +172,7 @@
 			pinctrl-4 = <&ship_sleep>;
 			pinctrl-5 = <&chg_qupv3_se12_2uart_sleep>;
 			pinctrl-6 = <&chg_qupv3_se12_2uart_default>;
+			pinctrl-7 = <&shortc_active>;
 
 //#endif //VENDOR_EDIT
 		qcom,chgr@1000 {
