@@ -186,6 +186,7 @@ void migrate_irqs(void)
 		affinity_broken = migrate_one_irq(desc);
 		raw_spin_unlock(&desc->lock);
 
+		//Nanwei.Deng@BSP.CHG.Basic 2018/07/11 reduce unecessary log
 		if (affinity_broken)
 			pr_warn_ratelimited("IRQ%u no longer affine to CPU%u\n",
 				i, smp_processor_id());

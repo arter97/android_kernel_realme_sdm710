@@ -62,6 +62,20 @@ enum pon_restart_reason {
 
 	/* 32 ~ 63 for OEMs/ODMs secific features */
 	PON_RESTART_REASON_OEM_MIN		= 0x20,
+#ifdef VENDOR_EDIT
+//yixue.ge@bsp.drv modify all the reboot mode as hardware reboot
+	PON_RESTART_REASON_SILENCE			= 0x21,
+	PON_RESTART_REASON_SAU				= 0x22,
+	PON_RESTART_REASON_RF				= 0x23,
+	PON_RESTART_REASON_WLAN				= 0x24,
+	PON_RESTART_REASON_MOS				= 0x25,
+	PON_RESTART_REASON_FACTORY			= 0x26,
+	PON_RESTART_REASON_KERNEL			= 0x27,
+	PON_RESTART_REASON_MODEM			= 0x28,
+	PON_RESTART_REASON_ANDROID			= 0x29,
+	PON_RESTART_REASON_SAFE				= 0x2A,
+	PON_RESTART_REASON_NORMAL			= 0x3E,
+#endif
 	PON_RESTART_REASON_OEM_MAX		= 0x3f,
 };
 

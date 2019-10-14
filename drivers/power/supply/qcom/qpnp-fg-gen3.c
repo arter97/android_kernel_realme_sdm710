@@ -26,6 +26,17 @@
 #include <linux/qpnp/qpnp-misc.h>
 #include "fg-core.h"
 #include "fg-reg.h"
+#ifdef VENDOR_EDIT
+//OuYangBaiLi@BSP.CHG.Basic 2018/11/26 modify for charging
+#include <soc/oppo/device_info.h>
+#include <soc/oppo/oppo_project.h>
+#include <linux/gpio.h>
+#include "../../oppo/oppo_gauge.h"
+#include <soc/oppo/boot_mode.h>
+
+static struct fg_chip *fg_gen3_chip = NULL;
+static struct oppo_gauge_chip *oppo_chip = NULL;
+#endif /* VENDOR_EDIT */
 
 #define FG_GEN3_DEV_NAME	"qcom,fg-gen3"
 
@@ -722,7 +733,7 @@ static int fg_get_battery_current(struct fg_chip *chip, int *val)
 	pr_debug("buf: %x %x temp: %llx\n", buf[0], buf[1], temp);
 	/* Sign bit is bit 15 */
 	temp = twos_compliment_extend(temp, 15);
-	*val = div_s64((s64)temp * BATT_CURRENT_NUMR, BATT_CURRENT_DENR);
+	*val = (div_s64((s64)temp * BATT_CURRENT_NUMR, BATT_CURRENT_DENR))/1000;
 	return 0;
 }
 
@@ -747,7 +758,10 @@ static int fg_get_battery_voltage(struct fg_chip *chip, int *val)
 		temp = buf[1] << 8 | buf[0];
 
 	pr_debug("buf: %x %x temp: %x\n", buf[0], buf[1], temp);
-	*val = div_u64((u64)temp * BATT_VOLTAGE_NUMR, BATT_VOLTAGE_DENR);
+#ifdef VENDOR_EDIT
+//OuYangBaiLi@BSP.CHG.Basic 2018/11/26 modify for charging
+	*val = ((div_u64((u64)temp * BATT_VOLTAGE_NUMR, BATT_VOLTAGE_DENR))/1000);
+#endif /* VENDOR_EDIT */
 	return 0;
 }
 
@@ -911,6 +925,8 @@ static int fg_get_prop_capacity(struct fg_chip *chip, int *val)
 	}
 
 	if (chip->battery_missing || !chip->soc_reporting_ready) {
+		pr_err("battery_missing=%d, soc_reporting_ready=%d\n",
+			chip->battery_missing, chip->soc_reporting_ready);
 		*val = BATT_MISS_SOC;
 		return 0;
 	}
@@ -2937,8 +2953,12 @@ static void status_change_work(struct work_struct *work)
 	struct fg_chip *chip = container_of(work,
 			struct fg_chip, status_change_work);
 	union power_supply_propval prop = {0, };
+#ifdef VENDOR_EDIT
+//OuYangBaiLi@BSP.CHG.Basic 2018/11/21 modify for charging
+	int rc, batt_temp,batt_soc,batt_v,batt_i;
+#else
 	int rc, batt_temp;
-
+#endif /* VENDOR_EDIT */
 	if (!batt_psy_initialized(chip)) {
 		fg_dbg(chip, FG_STATUS, "Charger not available?!\n");
 		goto out;
@@ -3012,7 +3032,24 @@ static void status_change_work(struct work_struct *work)
 			pr_err("Error in configuring ki_coeff_full_soc rc:%d\n",
 				rc);
 	}
+#ifdef VENDOR_EDIT
+//OuYangBaiLi@BSP.CHG.Basic 2018/11/21 modify for charging
+	rc = fg_get_prop_capacity(chip, &batt_soc);
+	if (rc < 0)
+		pr_err("Error getting battery capacity, rc=%d\n", rc);
 
+	rc = fg_get_battery_voltage(chip, &batt_v);
+	if (rc < 0)
+		pr_err("Error getting battery voltage, rc=%d\n", rc);
+
+	rc = fg_get_battery_current(chip, &batt_i);
+	if (rc < 0)
+		pr_err("Error getting battery current, rc=%d\n", rc);
+
+
+	pr_err("%s: battery info: temp = %d,soc = %d,v = %d,i = %d,id_ohms = %d \n",
+		__func__,batt_temp,batt_soc,batt_v,batt_i,chip->batt_id_ohms);
+#endif /* VENDOR_EDIT */
 	fg_ttf_update(chip);
 	chip->prev_charge_status = chip->charge_status;
 out:
@@ -3239,7 +3276,11 @@ static void profile_load_work(struct work_struct *work)
 				profile_load_work.work);
 	u8 buf[2], val;
 	int rc;
-
+#ifdef VENDOR_EDIT
+//OuYangBaiLi@BSP.CHG.Basic 2018/12/29 modify single vooc charge
+	unsigned char pcb_version = get_PCB_Version();
+	//pr_err("%s:get_PCB_Version, pcb_version:%d\n", __func__,pcb_version);
+#endif
 	vote(chip->awake_votable, PROFILE_LOAD, true, 0);
 
 	rc = fg_get_batt_id(chip);
@@ -3335,6 +3376,12 @@ done:
 	fg_dbg(chip, FG_STATUS, "profile loaded successfully");
 out:
 	chip->soc_reporting_ready = true;
+	/*Jun.Wei@RM.BSP.CHG.Basic, 2018/12/07, modify for oppo gauge init*/
+	#ifdef VENDOR_EDIT
+	pr_err("%s:oppo_gauge_init id_ohms = %d\n", __func__,chip->batt_id_ohms);
+	if((chip->batt_id_ohms<110000)&&(chip->batt_id_ohms>100000)&&(pcb_version < 4))
+		oppo_gauge_init(oppo_chip);
+	#endif
 	vote(chip->awake_votable, ESR_FCC_VOTER, true, 0);
 	schedule_delayed_work(&chip->pl_enable_work, msecs_to_jiffies(5000));
 	vote(chip->awake_votable, PROFILE_LOAD, false, 0);
@@ -4760,10 +4807,11 @@ static irqreturn_t fg_batt_missing_irq_handler(int irq, void *data)
 
 	clear_battery_profile(chip);
 	schedule_delayed_work(&chip->profile_load_work, 0);
-
+#ifndef VENDOR_EDIT
+//OuYangBaiLi@BSP.CHG.Basic 2018/11/26 modify for charging
 	if (chip->fg_psy)
 		power_supply_changed(chip->fg_psy);
-
+#endif /* VENDOR_EDIT */
 	return IRQ_HANDLED;
 }
 
@@ -4812,7 +4860,10 @@ static irqreturn_t fg_delta_batt_temp_irq_handler(int irq, void *data)
 				rc);
 
 		chip->last_batt_temp = batt_temp;
+#ifndef VENDOR_EDIT
+//OuYangBaiLi@BSP.CHG.Basic 2018/11/26 modify for charging
 		power_supply_changed(chip->batt_psy);
+#endif /* VENDOR_EDIT */
 	}
 
 	if (abs(chip->last_batt_temp - batt_temp) > 30)
@@ -4882,10 +4933,11 @@ static irqreturn_t fg_delta_msoc_irq_handler(int irq, void *data)
 	rc = fg_adjust_timebase(chip);
 	if (rc < 0)
 		pr_err("Error in adjusting timebase, rc=%d\n", rc);
-
+#ifndef VENDOR_EDIT
+//OuYangBaiLi@BSP.CHG.Basic 2018/11/26 modify for charging
 	if (batt_psy_initialized(chip))
 		power_supply_changed(chip->batt_psy);
-
+#endif /* VENDOR_EDIT */
 	return IRQ_HANDLED;
 }
 
@@ -4894,9 +4946,11 @@ static irqreturn_t fg_empty_soc_irq_handler(int irq, void *data)
 	struct fg_chip *chip = data;
 
 	fg_dbg(chip, FG_IRQ, "irq %d triggered\n", irq);
+#ifndef VENDOR_EDIT
+//OuYangBaiLi@BSP.CHG.Basic 2018/11/26 modify for charging
 	if (batt_psy_initialized(chip))
 		power_supply_changed(chip->batt_psy);
-
+#endif /* VENDOR_EDIT */
 	return IRQ_HANDLED;
 }
 
@@ -5628,9 +5682,20 @@ static void fg_cleanup(struct fg_chip *chip)
 		if (fg_irqs[i].irq)
 			devm_free_irq(chip->dev, fg_irqs[i].irq, chip);
 	}
-
+	#ifndef VENDOR_EDIT
+	//Fei.Mo@PSW.BSP.sensors, 2018/10/22, Moditfy for avoid null pointer
 	alarm_try_to_cancel(&chip->esr_filter_alarm);
 	debugfs_remove_recursive(chip->dfs_root);
+	#else
+	if (!IS_ERR_OR_NULL(chip->esr_filter_alarm.timer.function))
+		alarm_try_to_cancel(&chip->esr_filter_alarm);
+
+	if (!IS_ERR_OR_NULL(chip->nb.notifier_call))
+		power_supply_unreg_notifier(&chip->nb);
+
+	if (!IS_ERR_OR_NULL(chip->dfs_root))
+		debugfs_remove_recursive(chip->dfs_root);
+	#endif
 	if (chip->awake_votable)
 		destroy_votable(chip->awake_votable);
 
@@ -5668,7 +5733,206 @@ static int fg_tz_get_temp(void *data, int *temperature)
 static struct thermal_zone_of_device_ops fg_gen3_tz_ops = {
 	.get_temp = fg_tz_get_temp,
 };
+#ifdef VENDOR_EDIT
+//OuYangBaiLi@BSP.CHG.Basic 2018/11/26 modify for charging
+#define DEFAULT_BATT_SOC             50
+#define MAX_WAIT_FOR_HEALTHD_COUNT   12
+#define WAIT_FOR_HEALTHD_SOC         -1
+#define DEFAULT_BATT_TEMP            250
+#define DEFAULT_BATT_VOLT            3800
+#define DEFAULT_BATT_CURRENT         500
 
+
+static int oppo_fg_get_battery_mvolts(void)
+{
+	int rc = 0, batt_uv = 0;
+
+	if (!fg_gen3_chip) {
+			return DEFAULT_BATT_VOLT;
+	}
+
+	rc = fg_get_battery_voltage(fg_gen3_chip, &batt_uv);
+	if (rc < 0) {
+			pr_err("failed to get battery voltage, return 3800mv!\n");
+			return DEFAULT_BATT_VOLT;
+	}
+
+	return batt_uv;
+
+}
+static int oppo_fg_get_battery_temperature(void)
+{
+	int rc = 0, batt_temp = 0;
+
+	if (!fg_gen3_chip) {
+			return DEFAULT_BATT_TEMP;
+	}
+
+	rc = fg_get_battery_temp(fg_gen3_chip, &batt_temp);
+	if (rc < 0) {
+			pr_err("failed to get battery temp, return 25C\n");
+			return DEFAULT_BATT_TEMP;
+	}
+
+	return batt_temp;
+
+}
+
+static int oppo_fg_get_batt_remaining_capacity(void)
+{
+	int rc = 0,batt_x_soc;
+    //static int count = 0;
+
+    if (!fg_gen3_chip) {
+            return DEFAULT_BATT_SOC;
+    }
+
+    rc = fg_get_prop_capacity(fg_gen3_chip, &batt_x_soc);
+    if (rc < 0) {
+            pr_err("failed to get battery soc, return 50!\n");
+            return DEFAULT_BATT_SOC;
+    }
+	return batt_x_soc;
+}
+
+static int oppo_fg_get_battery_soc(void)
+{
+    int rc = 0, batt_soc = 0;
+    //static int count = 0;
+
+    if (!fg_gen3_chip) {
+            return DEFAULT_BATT_SOC;
+    }
+
+    rc = fg_get_prop_capacity(fg_gen3_chip, &batt_soc);
+    if (rc < 0) {
+            pr_err("failed to get battery soc, return 50!\n");
+            return DEFAULT_BATT_SOC;
+    }
+
+    if (get_boot_mode() == MSM_BOOT_MODE__RECOVERY) {
+            return batt_soc;
+    }
+
+#if 0
+    if (healthd_ready == false && count < MAX_WAIT_FOR_HEALTHD_COUNT) {
+            pr_debug("healthd not ready, count = %d\n", count);
+            count ++;
+            return WAIT_FOR_HEALTHD_SOC;
+    }
+#endif
+
+    return batt_soc;
+}
+
+static int oppo_fg_get_average_current(void)
+{
+	int rc = 0, batt_ua = 0;
+
+	if (!fg_gen3_chip) {
+			return DEFAULT_BATT_CURRENT;
+	}
+
+	rc = fg_get_battery_current(fg_gen3_chip, &batt_ua);
+	if (rc < 0) {
+			pr_err("failed to get battery current, return 500!\n");
+			return DEFAULT_BATT_CURRENT;
+	}
+
+	return batt_ua;
+
+}
+static void oppo_fg_set_battery_full(bool full)
+{
+        /* Do nothing */
+}
+static int oppo_fg_get_battery_fcc(void)
+{
+        return 0;
+}
+static int oppo_fg_get_battery_cc(void)
+{
+        return 0;
+}
+static int oppo_fg_get_battery_soh(void)
+{
+        return 0;
+}
+static bool oppo_fg_get_battery_authenticate(void)
+{
+        return true;
+}
+static int oppo_fg_get_prev_battery_mvolts(void)
+{
+        return 3800;
+}
+static int oppo_fg_get_prev_battery_temperature(void)
+{
+        return 250;
+}
+static int oppo_fg_get_prev_battery_soc(void)
+{
+        return 50;
+}
+static int oppo_fg_get_prev_average_current(void)
+{
+        return 100;
+}
+static int oppo_fg_get_prev_batt_remaining_capacity(void)
+{
+        return 0;
+}
+static int oppo_fg_get_battery_mvolts_2cell_max(void)
+{
+        return 3800;
+}
+static int oppo_fg_get_battery_mvolts_2cell_min(void)
+{
+        return 3800;
+}
+static int oppo_fg__prev_battery_mvolts_2cell_max(void)
+{
+        return 3800;
+}
+static int oppo_fg__prev_battery_mvolts_2cell_min(void)
+{
+        return 3800;
+}
+static int oppo_fg_modify_dod0(void)
+{
+        return 0;
+}
+
+static int oppo_fg_update_soc_smooth_parameter(void)
+{
+        return 0;
+}
+
+static struct oppo_gauge_operations oppo_gauge_ops = {
+	.get_battery_mvolts 				= oppo_fg_get_battery_mvolts,
+	.get_battery_temperature			= oppo_fg_get_battery_temperature,
+	.get_batt_remaining_capacity		= oppo_fg_get_batt_remaining_capacity,
+	.get_battery_soc					= oppo_fg_get_battery_soc,
+	.get_average_current				= oppo_fg_get_average_current,
+	.set_battery_full                   = oppo_fg_set_battery_full,
+    .get_battery_fcc                    = oppo_fg_get_battery_fcc,
+    .get_battery_cc                     = oppo_fg_get_battery_cc,
+    .get_battery_soh                    = oppo_fg_get_battery_soh,
+    .get_battery_authenticate        	= oppo_fg_get_battery_authenticate,
+	.get_prev_battery_mvolts    		= oppo_fg_get_prev_battery_mvolts,
+	.get_prev_battery_temperature 		= oppo_fg_get_prev_battery_temperature,
+    .get_prev_battery_soc				= oppo_fg_get_prev_battery_soc,
+	.get_prev_average_current			= oppo_fg_get_prev_average_current,
+	.get_prev_batt_remaining_capacity   = oppo_fg_get_prev_batt_remaining_capacity,
+	.get_battery_mvolts_2cell_max		= oppo_fg_get_battery_mvolts_2cell_max,
+	.get_battery_mvolts_2cell_min		= oppo_fg_get_battery_mvolts_2cell_min,
+	.get_prev_battery_mvolts_2cell_max		= oppo_fg__prev_battery_mvolts_2cell_max,
+	.get_prev_battery_mvolts_2cell_min		= oppo_fg__prev_battery_mvolts_2cell_min,
+	.update_battery_dod0				= oppo_fg_modify_dod0,
+	.update_soc_smooth_parameter		= oppo_fg_update_soc_smooth_parameter,
+
+};
+#endif /* VENDOR_EDIT */
 static int fg_gen3_probe(struct platform_device *pdev)
 {
 	struct fg_chip *chip;
@@ -5868,7 +6132,7 @@ static int fg_gen3_probe(struct platform_device *pdev)
 		rc = fg_get_battery_temp(chip, &batt_temp);
 
 	if (!rc) {
-		pr_info("battery SOC:%d voltage: %duV temp: %d\n",
+		pr_err("battery SOC:%d voltage: %duV temp: %d\n",
 				msoc, volt_uv, batt_temp);
 		rc = fg_esr_filter_config(chip, batt_temp, false);
 		if (rc < 0)
@@ -5883,6 +6147,20 @@ static int fg_gen3_probe(struct platform_device *pdev)
 		dev_err(chip->dev, "thermal_zone_of_sensor_register() failed rc:%d\n",
 			rc);
 	}
+
+#ifdef VENDOR_EDIT
+	//OuYangBaiLi@BSP.CHG.Basic 2018/11/26 modify for charging
+	fg_gen3_chip = chip;
+	oppo_chip = (struct oppo_gauge_chip*) kzalloc(sizeof(struct oppo_gauge_chip),
+					GFP_KERNEL);
+	if (!oppo_chip) {
+		pr_err("oppo_chip kzalloc() failed.\n");
+		return -ENOMEM;
+	}
+	pr_err("FG probed, batt_temp=%d\n", batt_temp);
+	oppo_chip->gauge_ops = &oppo_gauge_ops;
+	//oppo_gauge_init(oppo_chip);
+#endif /* VENDOR_EDIT */
 
 	device_init_wakeup(chip->dev, true);
 	schedule_delayed_work(&chip->profile_load_work, 0);

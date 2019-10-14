@@ -3909,6 +3909,10 @@ int sde_encoder_poll_line_counts(struct drm_encoder *drm_enc)
 	return -ETIMEDOUT;
 }
 
+#ifdef VENDOR_EDIT
+/*Liping-m@PSW.MM.Display.LCD.Stable,2019-04-26 add for dc backlight */
+extern int sde_connector_update_backlight(struct drm_connector *conn);
+#endif /* VENDOR_EDIT */
 int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 		struct sde_encoder_kickoff_params *params)
 {
@@ -3940,6 +3944,11 @@ int sde_encoder_prepare_for_kickoff(struct drm_encoder *drm_enc,
 	else
 		ln_cnt1 = -EINVAL;
 
+#ifdef VENDOR_EDIT
+/*Liping-m@PSW.MM.Display.LCD.Stable,2019-04-26 add for dc backlight */
+	if (sde_enc->cur_master)
+		sde_connector_update_backlight(sde_enc->cur_master->connector);
+#endif /* VENDOR_EDIT */
 	/* prepare for next kickoff, may include waiting on previous kickoff */
 	SDE_ATRACE_BEGIN("enc_prepare_for_kickoff");
 	for (i = 0; i < sde_enc->num_phys_encs; i++) {

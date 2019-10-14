@@ -28,6 +28,11 @@
 #include <linux/ipc_logging.h>
 #include <linux/dmaengine.h>
 #include <linux/msm_gpi.h>
+#ifdef VENDOR_EDIT
+/* Jianchao.Shi@PSW.BSP.CHG.Basic, 2018/04/05, sjc Add for charging */
+#include "../../power/oppo/oppo_vooc.h"
+#include <soc/oppo/boot_mode.h>
+#endif
 
 #define SE_I2C_TX_TRANS_LEN		(0x26C)
 #define SE_I2C_RX_TRANS_LEN		(0x270)
@@ -635,6 +640,45 @@ geni_i2c_gsi_xfer_out:
 	return ret;
 }
 
+#ifdef VENDOR_EDIT
+/* Jianchao.Shi@PSW.BSP.CHG.Basic, 2018/04/05, sjc Add for charging */
+#define MAX_RESET_COUNT	10
+#define I2C_RESET_BUS		0
+#define FG_DEVICE_ADDR		0x55
+#define DEVICE_TYPE_ZY0602       3
+static bool i2c_err_occured = false;
+static int fg_device_type = 0;
+
+bool oppo_get_fg_i2c_err_occured(void)
+{
+	return i2c_err_occured;
+}
+EXPORT_SYMBOL(oppo_get_fg_i2c_err_occured);
+
+void oppo_set_fg_i2c_err_occured(bool i2c_err)
+{
+	i2c_err_occured = i2c_err;
+}
+EXPORT_SYMBOL(oppo_set_fg_i2c_err_occured);
+
+int oppo_get_fg_device_type(void)
+{
+        pr_err("oppo_get_fg_device_type  fg_device_type[%d] \n", fg_device_type);
+        return fg_device_type;
+}
+EXPORT_SYMBOL(oppo_get_fg_device_type);
+
+void oppo_set_fg_device_type(int device_type)
+{
+        pr_err("oppo_set_fg_device_type  fg_device_type[%d] \n", fg_device_type);
+        fg_device_type = device_type;
+        return;
+}
+EXPORT_SYMBOL(oppo_set_fg_device_type);
+
+
+#endif /*VENDOR_EDIT*/
+
 static int geni_i2c_xfer(struct i2c_adapter *adap,
 			 struct i2c_msg msgs[],
 			 int num)
@@ -866,6 +910,25 @@ static int geni_i2c_probe(struct platform_device *pdev)
 		ret = PTR_ERR(gi2c->i2c_rsc.geni_gpio_sleep);
 		return ret;
 	}
+#ifdef VENDOR_EDIT
+/* Jianchao.Shi@PSW.BSP.CHG.Basic, 2018/04/05, sjc Add for charging */
+	gi2c->i2c_rsc.geni_gpio_pulldown =
+		pinctrl_lookup_state(gi2c->i2c_rsc.geni_pinctrl,
+							PINCTRL_PULLDOWN);
+	if (IS_ERR_OR_NULL(gi2c->i2c_rsc.geni_gpio_pulldown)) {
+		/*dev_err(&pdev->dev, "No pulldown config specified\n");
+		ret = PTR_ERR(gi2c->i2c_rsc.geni_gpio_pulldown);
+		return ret;*/
+	}
+	gi2c->i2c_rsc.geni_gpio_pullup =
+		pinctrl_lookup_state(gi2c->i2c_rsc.geni_pinctrl,
+							PINCTRL_PULLUP);
+	if (IS_ERR_OR_NULL(gi2c->i2c_rsc.geni_gpio_pullup)) {
+		/*dev_err(&pdev->dev, "No pulldown config specified\n");
+		ret = PTR_ERR(gi2c->i2c_rsc.geni_gpio_pullup);
+		return ret;*/
+	}
+#endif
 
 	if (of_property_read_u32(pdev->dev.of_node, "qcom,clk-freq-out",
 				&gi2c->i2c_rsc.clk_freq_out)) {

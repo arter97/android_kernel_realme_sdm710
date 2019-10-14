@@ -29,6 +29,17 @@
 #include <linux/compat.h>
 #endif
 
+//#ifdef VENDOR_EDIT
+//wenjie.Liu@CN.NFC.Basic.Hardware.1189038, 2017/12/21,
+//Add for : nfc_chip deviceinfo
+#include <soc/oppo/device_info.h>
+//#endif /* VENDOR_EDIT */
+
+//wenjie.Liu@CN.NFC.Basic.Hardware.1164987, 2017/11/28,
+// add for:NXP NQ330-NFC(driver),current audio pull low i2c ,need enable audio; then later need to remove
+#ifdef VENDOR_EDIT
+#include <soc/oppo/oppo_project.h>
+#endif
 struct nqx_platform_data {
 	unsigned int irq_gpio;
 	unsigned int en_gpio;
@@ -44,6 +55,14 @@ static const struct of_device_id msm_match_table[] = {
 	{.compatible = "qcom,nq-nci"},
 	{}
 };
+#ifdef VENDOR_EDIT
+//wenjie.Liu@CN.NFC.Basic.Hardware.1189038, 2017/12/21,
+//Add for : nfc_chip deviceinfo,
+struct manufacture_info nfc_chip_info = {
+	.version = "pn54x",
+	.manufacture = "nxp",
+};
+#endif /* VENDOR_EDIT */
 
 MODULE_DEVICE_TABLE(of, msm_match_table);
 
@@ -662,6 +681,9 @@ static int nfcc_hw_check(struct i2c_client *client, struct nqx_dev *nqx_dev)
 {
 	int ret = 0;
 
+	#ifndef VENDOR_EDIT
+	//wenjie.Liu@CN.NFC.Basic.Hardware.1209105, 2018/01/06,
+	//Modify for : send get firmware version
 	unsigned char raw_nci_reset_cmd[] =  {0x20, 0x00, 0x01, 0x00};
 	unsigned char raw_nci_init_cmd[] =   {0x20, 0x01, 0x00};
 	unsigned char nci_get_version_cmd[] = {0x00, 0x04, 0xF1,
@@ -670,8 +692,19 @@ static int nfcc_hw_check(struct i2c_client *client, struct nqx_dev *nqx_dev)
 	unsigned char nci_reset_rsp[6];
 	unsigned char nci_get_version_rsp[12];
 	unsigned char init_rsp_len = 0;
+	#else
+	unsigned char raw_fw_get_version_cmd[] =  {0x00, 0x04, 0xF1, 0x00, 0x00, 0x00, 0x6E, 0xEF};
+	unsigned char fw_get_version_rsp[14];
+	unsigned int firm_gpio = nqx_dev->firm_gpio;
+	#endif /* VENDOR_EDIT */
 	unsigned int enable_gpio = nqx_dev->en_gpio;
-
+	//#ifdef VENDOR_EDIT
+	//wenjie.Liu@CN.NFC.Basic.Hardware.1209105, 2018/01/06,
+	//Add for : send get firmware version
+	gpio_set_value(firm_gpio, 1);
+	/* hardware dependent delay */
+	usleep_range(10000, 10100);
+	//#endif /* VENDOR_EDIT */
 	/* making sure that the NFCC starts in a clean state. */
 	gpio_set_value(enable_gpio, 0);/* ULPM: Disable */
 	/* hardware dependent delay */
@@ -680,6 +713,10 @@ static int nfcc_hw_check(struct i2c_client *client, struct nqx_dev *nqx_dev)
 	/* hardware dependent delay */
 	usleep_range(10000, 10100);
 
+#ifndef VENDOR_EDIT
+//wenjie.Liu@CN.NFC.Basic.Hardware.1209105, 2018/01/06,
+//Modify for :send get firmware version , sometime firmware cannot reset
+//in this case ,can download firmware to resolve
 	/* send NCI CORE RESET CMD with Keep Config parameters */
 	ret = i2c_master_send(client, raw_nci_reset_cmd,
 						sizeof(raw_nci_reset_cmd));
@@ -839,6 +876,39 @@ err_nfcc_core_init_fail:
 	__func__, nci_reset_rsp[0],
 	nci_reset_rsp[1], nci_reset_rsp[2]);
 
+#else /* VENDOR_EDIT */
+	/* send get FW Version CMD */
+	ret = i2c_master_send(client, raw_fw_get_version_cmd,
+						sizeof(raw_fw_get_version_cmd));
+	if (ret < 0) {
+		dev_err(&client->dev,
+		"%s: - i2c_master_send Error\n", __func__);
+		goto err_nfcc_hw_check;
+	}
+	/* hardware dependent delay */
+	usleep_range(30000,30100);
+
+	/* Read Response of get fw version */
+	ret = i2c_master_recv(client, fw_get_version_rsp,
+						sizeof(fw_get_version_rsp));
+	dev_err(&client->dev,
+		"%s: - nq - firm cmd answer : NfcNciRx %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x \n",
+			__func__, fw_get_version_rsp[0], fw_get_version_rsp[1],
+			fw_get_version_rsp[2], fw_get_version_rsp[3], fw_get_version_rsp[4], fw_get_version_rsp[5], fw_get_version_rsp[6],
+			fw_get_version_rsp[7], fw_get_version_rsp[8], fw_get_version_rsp[9], fw_get_version_rsp[10], fw_get_version_rsp[11],
+			fw_get_version_rsp[12], fw_get_version_rsp[13]);
+	if (ret < 0) {
+		dev_err(&client->dev,
+		"%s: - i2c_master_recv Error\n", __func__);
+		goto err_nfcc_hw_check;
+	}
+	gpio_set_value(firm_gpio, 0);
+#endif /* VENDOR_EDIT */
+	/*Disable NFC by default to save power on boot*/
+	gpio_set_value(enable_gpio, 0);/* ULPM: Disable */
+	ret = 0;
+	goto done;
+
 err_nfcc_hw_check:
 	ret = -ENXIO;
 	dev_err(&client->dev,
@@ -956,7 +1026,24 @@ static int nqx_probe(struct i2c_client *client,
 	struct nqx_platform_data *platform_data;
 	struct nqx_dev *nqx_dev;
 
-	dev_dbg(&client->dev, "%s: enter\n", __func__);
+	dev_err(&client->dev, "%s: enter\n", __func__);
+
+	//wenjie.Liu@CN.NFC.Basic.Hardware.1164987, 2017/11/28,
+	// add for:nfc chip share same irq ,cannot probe
+	/* so need Distinguish 17085,
+	* Operator_Version equals 5
+	 */
+#ifdef VENDOR_EDIT
+		if (is_project(OPPO_18181)) {
+			dev_err(&client->dev, "normal  nqx_probe Project[18181] ] \n");
+		} else if ((is_project(OPPO_18097) || is_project(OPPO_18099))) {
+			dev_err(&client->dev, "normal  nqx_probe Project[OPPO_18097] ] \n");
+		} else {
+			dev_err(&client->dev, "wrong  nqx_probe get_project[%d] \n", get_project());
+			return -ENODEV;
+		}
+#endif
+
 	if (client->dev.of_node) {
 		platform_data = devm_kzalloc(&client->dev,
 			sizeof(struct nqx_platform_data), GFP_KERNEL);
@@ -1118,7 +1205,7 @@ static int nqx_probe(struct i2c_client *client,
 	} else {
 		dev_err(&client->dev,
 			"%s: clkreq gpio not provided\n", __func__);
-		goto err_ese_gpio;
+		//goto err_ese_gpio;
 	}
 
 	nqx_dev->en_gpio = platform_data->en_gpio;

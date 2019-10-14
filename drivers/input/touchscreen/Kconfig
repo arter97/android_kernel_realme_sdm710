@@ -1302,6 +1302,10 @@ config TOUCHSCREEN_HIMAX_CHIPSET
           If unsure, say N.
 
 source "drivers/input/touchscreen/hxchipset/Kconfig"
+#ifdef VENDOR_EDIT
+#Wanghao@Bsp.group.Tp,2017-09-20,Added for common touchpanel driver
+source "drivers/input/touchscreen/oppo_touchscreen/Kconfig"
+#endif
 
 config TOUCHSCREEN_EKTF3XXX_CHIPSET
 	bool "Elan EKTF3XXX touchpanel CHIPSET"

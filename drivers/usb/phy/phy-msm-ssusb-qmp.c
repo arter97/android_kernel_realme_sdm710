@@ -445,6 +445,10 @@ static void usb_qmp_powerup_phy(struct msm_ssphy_qmp *phy)
 	mb();
 }
 
+#ifdef VENDOR_EDIT
+/* tongfeng.Huang@BSP.CHG.Basic, 2018/09/05,  Add for usb3 eye diagram */
+int oppo_m3p5db_v0 = 0x13;  // 0x1c28, PCS_TXDEEMPH_M3P5DB_V0
+#endif
 /* SSPHY Initialization */
 static int msm_ssphy_qmp_init(struct usb_phy *uphy)
 {
@@ -483,7 +487,13 @@ static int msm_ssphy_qmp_init(struct usb_phy *uphy)
 		dev_err(uphy->dev, "Failed the main PHY configuration\n");
 		return ret;
 	}
-
+#ifdef VENDOR_EDIT
+/* tongfeng.Huang@BSP.CHG.Basic, 2018/09/05,  Add for usb3 eye diagram */
+	if(oppo_m3p5db_v0 != 0) {
+		dev_err(uphy->dev, "oppo rewrite  0x1c28, PCS_TXDEEMPH_M3P5DB_V0 = [0x%x]\n", oppo_m3p5db_v0);
+		writel_relaxed(oppo_m3p5db_v0, phy->base + 0x1c28);
+	}
+#endif
 	/* perform software reset of PHY common logic */
 	if (phy->phy.type == USB_PHY_TYPE_USB3_AND_DP)
 		writel_relaxed(0x00,

@@ -2149,6 +2149,13 @@ static int pon_register_twm_notifier(struct qpnp_pon *pon)
 	return rc;
 }
 
+#ifdef VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/16, interface to read PMIC reg PON_REASON and POFF_REASON */
+extern char pon_reason[];
+extern char poff_reason[];
+int preason_initialized;
+#endif /*VENDOR_EDIT*/
+
 static int qpnp_pon_probe(struct platform_device *pdev)
 {
 	struct qpnp_pon *pon;
@@ -2164,6 +2171,12 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 	u8 s3_src_reg;
 	unsigned long flags;
 	uint temp = 0;
+	#ifdef VENDOR_EDIT
+	/* YiXue.Ge@PSW.BSP.Kernel.Stablity, 2017-12-20
+	* add some log to get pwk status..
+	*/
+	u32 pon_rt_sts = 0;
+	#endif
 
 	pon = devm_kzalloc(&pdev->dev, sizeof(struct qpnp_pon), GFP_KERNEL);
 	if (!pon)
@@ -2284,6 +2297,13 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 		dev_err(&pon->pdev->dev,
 			"Unable to read PON_RESASON1 reg rc: %d\n",
 			rc);
+#ifdef VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/16, interface to read PMIC reg PON_REASON and POFF_REASON */
+		if (!preason_initialized) {
+			snprintf(pon_reason, 128, "Unable to read PON_RESASON1 reg rc: %d\n", rc);
+			preason_initialized = 1;
+		}
+#endif /*VENDOR_EDIT*/
 		goto err_out;
 	}
 
@@ -2291,12 +2311,22 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 		boot_reason = ffs(pon_sts);
 
 	index = ffs(pon_sts) - 1;
+#ifdef VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/18, when KPDPWR_N is set it is PWK start*/
+	if (pon_sts & 0x80)
+		index = 7;
+#endif /*VENDOR_EDIT*/
 	cold_boot = !qpnp_pon_is_warm_reset();
 	if (index >= ARRAY_SIZE(qpnp_pon_reason) || index < 0) {
 		dev_info(&pon->pdev->dev,
 			"PMIC@SID%d Power-on reason: Unknown and '%s' boot\n",
 			to_spmi_device(pon->pdev->dev.parent)->usid,
 			 cold_boot ? "cold" : "warm");
+#ifdef VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/16, interface to read PMIC reg PON_REASON and POFF_REASON */
+		if (!preason_initialized)
+			snprintf(pon_reason, 128, "Unknown[0x%02X] and '%s' boot\n", pon_sts, cold_boot ? "cold" : "warm");
+#endif /*VENDOR_EDIT*/
 	} else {
 		pon->pon_trigger_reason = index;
 		dev_info(&pon->pdev->dev,
@@ -2304,6 +2334,12 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 			to_spmi_device(pon->pdev->dev.parent)->usid,
 			 qpnp_pon_reason[index],
 			cold_boot ? "cold" : "warm");
+#ifdef VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/16, interface to read PMIC reg PON_REASON and POFF_REASON */
+		if (!preason_initialized)
+			snprintf(pon_reason, 128, "[0x%02X]%s and '%s' boot\n", pon_sts,
+				qpnp_pon_reason[index],	cold_boot ? "cold" : "warm");
+#endif /*VENDOR_EDIT*/
 	}
 
 	/* POFF reason */
@@ -2318,6 +2354,13 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 		if (rc) {
 			dev_err(&pon->pdev->dev, "Unable to read POFF_REASON regs rc:%d\n",
 				rc);
+#ifdef VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/16, interface to read PMIC reg PON_REASON and POFF_REASON */
+			if (!preason_initialized) {
+				snprintf(poff_reason, 128, "Unable to read POFF_RESASON regs rc:%d\n", rc);
+				preason_initialized = 1;
+			}
+#endif /*VENDOR_EDIT*/
 			goto err_out;
 		}
 		poff_sts = buf[0] | (buf[1] << 8);
@@ -2327,12 +2370,26 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 		dev_info(&pon->pdev->dev,
 				"PMIC@SID%d: Unknown power-off reason\n",
 				to_spmi_device(pon->pdev->dev.parent)->usid);
+#ifdef VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/16, interface to read PMIC reg PON_REASON and POFF_REASON */
+		if (!preason_initialized) {
+			snprintf(poff_reason, 128, "Unknown[0x%04X]\n", poff_sts);
+			preason_initialized = 1;
+		}
+#endif /*VENDOR_EDIT*/
 	} else {
 		pon->pon_power_off_reason = index;
 		dev_info(&pon->pdev->dev,
 				"PMIC@SID%d: Power-off reason: %s\n",
 				to_spmi_device(pon->pdev->dev.parent)->usid,
 				qpnp_poff_reason[index]);
+#ifdef VENDOR_EDIT
+/* fanhui@PhoneSW.BSP, 2016/05/16, interface to read PMIC reg PON_REASON and POFF_REASON */
+		if (!preason_initialized) {
+			snprintf(poff_reason, 128, "[0x%04X]%s\n", poff_sts, qpnp_poff_reason[index]);
+			preason_initialized = 1;
+		}
+#endif /*VENDOR_EDIT*/
 	}
 
 	if (pon->pon_trigger_reason == PON_SMPL ||
@@ -2605,6 +2662,14 @@ static int qpnp_pon_probe(struct platform_device *pdev)
 
 	pon->legacy_hard_reset_offset = of_property_read_bool(pdev->dev.of_node,
 					"qcom,use-legacy-hard-reset-offset");
+
+	#ifdef VENDOR_EDIT
+	/* YiXue.Ge@PSW.BSP.Kernel.Stablity, 2017-12-20
+	* add some log to get pwk status..
+	*/
+	regmap_read(pon->regmap, QPNP_PON_RT_STS(pon), &pon_rt_sts);
+	dev_info(&pon->pdev->dev,"probe keycode = 116,key_st = 0x%x\n", pon_rt_sts);
+	#endif
 
 	qpnp_pon_debugfs_init(pdev);
 	return 0;

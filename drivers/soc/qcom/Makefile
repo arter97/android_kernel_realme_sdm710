@@ -88,7 +88,10 @@ obj-$(CONFIG_MSM_BGRSB) += bg_rsb.o
 obj-$(CONFIG_MSM_BGCOM_INTERFACE) += bgcom_interface.o
 obj-$(CONFIG_MSM_JTAGV8) += jtagv8.o jtagv8-etm.o
 obj-$(CONFIG_QCOM_COMMAND_DB) += cmd-db.o
-obj-$(CONFIG_MSM_QBT1000) += qbt1000.o
+#ifdef VENDOR_EDIT
+#Ran.Chen@BSP.Fingerprint.Basic, 2018/04/25, remove for fingerprint driver
+#obj-$(CONFIG_MSM_QBT1000) += qbt1000.o
+#endif
 obj-$(CONFIG_MSM_EVENT_TIMER) += event_timer.o
 obj-$(CONFIG_MSM_IDLE_STATS)	+= lpm-stats.o
 obj-$(CONFIG_QCOM_DCC) += dcc.o

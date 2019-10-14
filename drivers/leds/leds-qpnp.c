@@ -28,6 +28,11 @@
 #include <linux/regulator/consumer.h>
 #include <linux/delay.h>
 
+#ifdef VENDOR_EDIT
+//wanghao@Bsp.bootloader.device,2017/4/17, add for forbid backlight led in silence & sau mode
+extern int lcd_closebl_flag;
+#endif
+
 #define WLED_MOD_EN_REG(base, n)	(base + 0x60 + n*0x10)
 #define WLED_IDAC_DLY_REG(base, n)	(WLED_MOD_EN_REG(base, n) + 0x01)
 #define WLED_FULL_SCALE_REG(base, n)	(WLED_IDAC_DLY_REG(base, n) + 0x01)
@@ -556,6 +561,10 @@ struct qpnp_led_data {
 	bool				default_on;
 	bool				in_order_command_processing;
 	int				turn_off_delay_ms;
+#ifdef VENDOR_EDIT
+//wanghao@Bsp.bootloader.device,2017/5/02, add for sepearate the breathlight current
+	int             ratio;
+#endif
 };
 
 static DEFINE_MUTEX(flash_lock);
@@ -1707,12 +1716,23 @@ static int qpnp_kpdbl_set(struct qpnp_led_data *led)
 
 	return 0;
 }
+#ifdef VENDOR_EDIT
+//rendong.shi@Bsp.bootloader.device,2017/2/19,add for breath led
+static int qpnp_pwm_init(struct pwm_config_data *pwm_cfg,
+					struct platform_device *pdev,
+					const char *name);
+#endif
 
 static int qpnp_rgb_set(struct qpnp_led_data *led)
 {
 	int rc;
 	int duty_us, duty_ns, period_us;
 
+	#ifdef VENDOR_EDIT
+	//rendong.shi@Bsp.bootloader.device,2017/2/19,add for breath led
+	pwm_free(led->rgb_cfg->pwm_cfg->pwm_dev);
+	qpnp_pwm_init(led->rgb_cfg->pwm_cfg, led->pdev, led->cdev.name);
+    #endif
 	if (led->cdev.brightness) {
 		if (!led->rgb_cfg->pwm_cfg->blinking)
 			led->rgb_cfg->pwm_cfg->mode =
@@ -1736,8 +1756,16 @@ static int qpnp_rgb_set(struct qpnp_led_data *led)
 				duty_us,
 				period_us);
 		} else {
-			duty_ns = ((period_us * NSEC_PER_USEC) /
-				LED_FULL) * led->cdev.brightness;
+			#ifdef VENDOR_EDIT
+			//rendong.shi@Bsp.bootloader.device,2017/2/19,add for breath led
+			if (led->id == QPNP_ID_RGB_BLUE) {
+				duty_ns = ((period_us * NSEC_PER_USEC) / LED_FULL) *
+						led->cdev.brightness * led->ratio / 100;
+			} else {
+				duty_ns = ((period_us * NSEC_PER_USEC) /
+					LED_FULL) * led->cdev.brightness;
+			}
+			#endif
 			rc = pwm_config(
 				led->rgb_cfg->pwm_cfg->pwm_dev,
 				duty_ns,
@@ -1777,7 +1805,11 @@ static int qpnp_rgb_set(struct qpnp_led_data *led)
 		}
 	}
 
+	#ifndef VENDOR_EDIT
+	//rendong.shi@Bsp.bootloader.device,2017/2/19,add for breath led
 	led->rgb_cfg->pwm_cfg->blinking = false;
+	#endif
+
 	qpnp_dump_regs(led, rgb_pwm_debug_regs, ARRAY_SIZE(rgb_pwm_debug_regs));
 
 	return 0;
@@ -1793,6 +1825,14 @@ static void qpnp_led_set(struct led_classdev *led_cdev,
 		dev_err(&led->pdev->dev, "Invalid brightness value\n");
 		return;
 	}
+
+#ifdef VENDOR_EDIT
+//wanghao@Bsp.bootloader.device,2017/4/17, add for forbid backlight led in silence & sau mode
+       if(lcd_closebl_flag){
+            pr_err("%s -- MSM_BOOT_MODE__SILENCE\n",__func__);
+            value = 0;
+       }
+#endif
 
 	if (value > led->cdev.max_brightness)
 		value = led->cdev.max_brightness;
@@ -2646,6 +2686,9 @@ static void led_blink(struct qpnp_led_data *led,
 	flush_work(&led->work);
 	mutex_lock(&led->lock);
 	if (pwm_cfg->use_blink) {
+
+		#ifndef VENDOR_EDIT
+		//rendong.shi@Bsp.bootloader.device,2017/2/19,add for breath led
 		if (led->cdev.brightness) {
 			pwm_cfg->blinking = true;
 			if (led->id == QPNP_ID_LED_MPP)
@@ -2662,6 +2705,36 @@ static void led_blink(struct qpnp_led_data *led,
 				led->kpdbl_cfg->pwm_mode =
 						pwm_cfg->default_mode;
 		}
+		#else
+		if (led->id != QPNP_ID_RGB_RED && led->id != QPNP_ID_RGB_GREEN
+				&& led->id != QPNP_ID_RGB_BLUE) {
+			if (led->cdev.brightness) {
+				pwm_cfg->blinking = true;
+				if (led->id == QPNP_ID_LED_MPP)
+					led->mpp_cfg->pwm_mode = LPG_MODE;
+				else if (led->id == QPNP_ID_KPDBL)
+					led->kpdbl_cfg->pwm_mode = LPG_MODE;
+				pwm_cfg->mode = LPG_MODE;
+			} else {
+				pwm_cfg->blinking = false;
+				pwm_cfg->mode = pwm_cfg->default_mode;
+				if (led->id == QPNP_ID_LED_MPP)
+					led->mpp_cfg->pwm_mode = pwm_cfg->default_mode;
+				else if (led->id == QPNP_ID_KPDBL)
+					led->kpdbl_cfg->pwm_mode =
+							pwm_cfg->default_mode;
+			}
+			pwm_free(pwm_cfg->pwm_dev);
+			qpnp_pwm_init(pwm_cfg, led->pdev, led->cdev.name);
+
+		} else {
+				if(pwm_cfg->blinking == true)
+					pwm_cfg->mode = LPG_MODE;
+				else
+					pwm_cfg->mode = pwm_cfg->default_mode;
+		}
+		#endif
+
 		if (pwm_cfg->pwm_enabled) {
 			pwm_disable(pwm_cfg->pwm_dev);
 			pwm_cfg->pwm_enabled = 0;
@@ -2669,10 +2742,13 @@ static void led_blink(struct qpnp_led_data *led,
 		qpnp_pwm_init(pwm_cfg, led->pdev, led->cdev.name);
 		if (led->id == QPNP_ID_RGB_RED || led->id == QPNP_ID_RGB_GREEN
 				|| led->id == QPNP_ID_RGB_BLUE) {
+			#ifndef VENDOR_EDIT
+			//rendong.shi@Bsp.bootloader.device,2017/2/19,add for breath led
 			rc = qpnp_rgb_set(led);
 			if (rc < 0)
 				dev_err(&led->pdev->dev,
 				"RGB set brightness failed (%d)\n", rc);
+			#endif
 		} else if (led->id == QPNP_ID_LED_MPP) {
 			rc = qpnp_mpp_set(led);
 			if (rc < 0)
@@ -2701,7 +2777,14 @@ static ssize_t blink_store(struct device *dev,
 	if (ret)
 		return ret;
 	led = container_of(led_cdev, struct qpnp_led_data, cdev);
-	led->cdev.brightness = blinking ? led->cdev.max_brightness : 0;
+
+	#ifdef VENDOR_EDIT
+	//rendong.shi@BSP.bootloader.device,2017/2/18,modify for white breath leds
+	if((led->id != QPNP_ID_RGB_RED && led->id != QPNP_ID_RGB_GREEN && led->id != QPNP_ID_RGB_BLUE ))
+		led->cdev.brightness = blinking ? led->cdev.max_brightness : 0;
+	else
+		led->rgb_cfg->pwm_cfg->blinking = blinking ? true : false;
+	#endif
 
 	switch (led->id) {
 	case QPNP_ID_LED_MPP:
@@ -3662,6 +3745,16 @@ static int qpnp_get_config_rgb(struct qpnp_led_data *led,
 		led->rgb_cfg->enable = RGB_LED_ENABLE_BLUE;
 	else
 		return -EINVAL;
+
+	#ifdef VENDOR_EDIT
+	//wanghao@Bsp.bootloader.device,2017/5/02, add for sepearate the breathlight current
+	rc = of_property_read_u32(node, "qcom,ratio", &led->ratio);
+	if (rc < 0) {
+		dev_err(&led->pdev->dev,
+			"Failure reading project id, rc = %d\n", rc);
+		led->ratio = 1;
+	}
+	#endif
 
 	rc = of_property_read_string(node, "qcom,mode", &mode);
 	if (!rc) {
