@@ -29,10 +29,6 @@
 #include <linux/slab.h>
 #include <linux/tty.h>
 #include <linux/tty_flip.h>
-#ifdef VENDOR_EDIT
-//Nanwei.Deng@BSP.CHG.Basic 2018/05/01 add for console
-#include <soc/oppo/boot_mode.h>
-#endif /* VENDOR_EDIT */
 
 /* UART specific GENI registers */
 #define SE_UART_LOOPBACK_CFG		(0x22C)
@@ -174,12 +170,6 @@ struct msm_geni_serial_port {
 
 static const struct uart_ops msm_geni_serial_pops;
 static struct uart_driver msm_geni_console_driver;
-
-#ifdef VENDOR_EDIT
-//Nanwei.Deng@BSP.CHG.Basic 2018/05/01 add for console
-static struct uart_driver msm_geni_console_driver_no_cons;
-#endif
-
 static struct uart_driver msm_geni_serial_hs_driver;
 static int handle_rx_console(struct uart_port *uport,
 			unsigned int rx_fifo_wc,
@@ -207,66 +197,6 @@ static atomic_t uart_line_id = ATOMIC_INIT(0);
 
 static struct msm_geni_serial_port msm_geni_console_port;
 static struct msm_geni_serial_port msm_geni_serial_ports[GENI_UART_NR_PORTS];
-#ifdef VENDOR_EDIT
-//Jiaochao.Shi@BSP.CHG.Basic 2018/05/01 add for console
-#define UARTDM_TXFS			0x4c
-#define UARTDM_RXFS			0x50
-static struct pinctrl *serial_pinctrl = NULL;
-static struct pinctrl_state *serial_pinctrl_state_disable = NULL;
-#endif
-#ifdef VENDOR_EDIT
-//Nanwei.Deng@BSP.CHG.Basic 2018/05/01  Add for debug console reg issue 969323*/
-bool boot_with_console(void)
-{
-#ifdef CONFIG_OPPO_DAILY_BUILD
-	return true;
-
-#else
-
-	if(get_boot_mode() == MSM_BOOT_MODE__FACTORY)
-	{
-		return true;
-	}
-	else {
-		if(oem_get_uartlog_status() == true)
-		{
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-	}
-#endif /* CONFIG_OPPO_DAILY_BUILD */
-}
-EXPORT_SYMBOL(boot_with_console);
-
-#endif/*VENDOR_EDIT*/
-
-#ifdef VENDOR_EDIT
-/* Jianfeng.Qiu@PSW.MM.AudioDriver.Codec, 2018/05/15, Add for enale/disable HStty1 pin for smart mic */
-int msm_geni_iacore_uart_pinctrl_enable(int enable)
-{
-	int ret = 0;
-	struct msm_geni_serial_port *port = &msm_geni_serial_ports[1];
-	struct se_geni_rsc *rsc = &port->serial_rsc;
-
-	if (enable){
-		ret = pinctrl_select_state(rsc->geni_pinctrl, rsc->geni_gpio_active);
-		if (ret)
-			pr_err("%s: Error %d pinctrl_select_state\n", __func__, ret);
-	} else {
-		ret = pinctrl_select_state(rsc->geni_pinctrl, rsc->geni_gpio_sleep);
-		if (ret)
-			pr_err("%s: Error %d pinctrl_select_state\n", __func__, ret);
-	}
-	pr_debug("%s: enable:%d iacore uart: %s, wakeup_irq: %d, uport_irq:%d\n", __func__, enable,
-		port->name, port->wakeup_irq, port->uport.irq);
-	return ret;
-
-}
-EXPORT_SYMBOL(msm_geni_iacore_uart_pinctrl_enable);
-#endif /* VENDOR_EDIT */
 
 static void msm_geni_serial_config_port(struct uart_port *uport, int cfg_flags)
 {
@@ -783,12 +713,6 @@ __msm_geni_serial_console_write(struct uart_port *uport, const char *s,
 	int fifo_depth = DEF_FIFO_DEPTH_WORDS;
 	int tx_wm = DEF_TX_WM;
 
-#ifdef VENDOR_EDIT
-//Nanwei.Deng@BSP.CHG.Basic 2018/05/01 add for console
-	if (boot_with_console() == false) {
-		return;
-	}
-#endif
 	for (i = 0; i < count; i++) {
 		if (s[i] == '\n')
 			new_line++;
@@ -1403,14 +1327,10 @@ static int msm_geni_serial_handle_dma_rx(struct uart_port *uport, bool drop_rx)
 	tport = &uport->state->port;
 	ret = tty_insert_flip_string(tport, (unsigned char *)(msm_port->rx_buf),
 				     rx_bytes);
-	#ifndef VENDOR_EDIT
 	/*Jianfeng.Qiu@PSW.MM.AudioDriver.1427784, 2018/07/14,
 	 *Modify for serial warning issue.
 	 */
-	if (ret != rx_bytes) {
-	#else /* VENDOR_EDIT */
 	if (ret != rx_bytes && (msm_port != &msm_geni_serial_ports[1])) {
-	#endif /* VENDOR_EDIT */
 		dev_err(uport->dev, "%s: ret %d rx_bytes %d\n", __func__,
 								ret, rx_bytes);
 		WARN_ON(1);
@@ -1653,20 +1573,15 @@ static void msm_geni_serial_shutdown(struct uart_port *uport)
 	if (uart_console(uport)) {
 		console_stop(uport->cons);
 	} else {
-		#ifndef VENDOR_EDIT
 		/*Jianfeng.Qiu@PSW.MM.AudioDriver.Codec.1427784, 2018/07/14,
 		 *Modify for smartmic stabiltiy.
 		 */
-		msm_geni_serial_power_on(uport);
-		wait_for_transfers_inflight(uport);
-		#else /* VENDOR_EDIT */
 		if (msm_port != &msm_geni_serial_ports[1]) {
 			msm_geni_serial_power_on(uport);
 			wait_for_transfers_inflight(uport);
 		} else {
 			IPC_LOG_MSG(msm_port->ipc_log_misc, "bypass msm_geni_serial_power_on\n");
 		}
-		#endif /* VENDOR_EDIT */
 	}
 
 	disable_irq(uport->irq);
@@ -2294,17 +2209,6 @@ static struct uart_driver msm_geni_console_driver = {
 	.nr =  GENI_UART_NR_PORTS,
 	.cons = &cons_ops,
 };
-#ifdef VENDOR_EDIT
-//Nanwei.Deng@BSP.CHG.Basic 2018/05/01 add for console
-static struct uart_driver msm_geni_console_driver_no_cons = {
-	.owner = THIS_MODULE,
-	.driver_name = "msm_geni_console",
-	.dev_name = "ttyMSM",
-	.nr =  GENI_UART_NR_PORTS,
-	.cons = NULL,
-};
-#endif
-
 #else
 static int console_register(struct uart_driver *drv)
 {
@@ -2450,33 +2354,27 @@ static int msm_geni_serial_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
-#ifdef VENDOR_EDIT
-//Nanwei.Deng@BSP.CHG.Basic 2018/05/01 add for console
-	if (boot_with_console() == false) {
-		if (drv->cons) {
-		    #ifdef VENDOR_EDIT
-			//Jiaochao.Shi@BSP.CHG.Basic 2018/05/01 add for console
-			pr_err("%s: console start get pinctrl\n", __FUNCTION__);
-			serial_pinctrl = devm_pinctrl_get(&pdev->dev);
-			if (IS_ERR_OR_NULL(serial_pinctrl)) {
-				dev_err(&pdev->dev, "No serial_pinctrl config specified!\n");
+	if (drv->cons) {
+		static struct pinctrl *serial_pinctrl;
+		static struct pinctrl_state *serial_pinctrl_state_disable;
+		//Jiaochao.Shi@BSP.CHG.Basic 2018/05/01 add for console
+		pr_err("%s: console start get pinctrl\n", __FUNCTION__);
+		serial_pinctrl = devm_pinctrl_get(&pdev->dev);
+		if (IS_ERR_OR_NULL(serial_pinctrl)) {
+			dev_err(&pdev->dev, "No serial_pinctrl config specified!\n");
+		} else {
+			pr_err("%s: console get uart gpio sleep pinctrl!\n", __FUNCTION__);
+			serial_pinctrl_state_disable =
+					pinctrl_lookup_state(serial_pinctrl, PINCTRL_SLEEP);
+			if (IS_ERR_OR_NULL(serial_pinctrl_state_disable)) {
+				dev_err(&pdev->dev, "No serial_pinctrl_state_disable config specified!\n");
 			} else {
-				pr_err("%s: console get uart gpio sleep pinctrl!\n", __FUNCTION__);
-				serial_pinctrl_state_disable =
-						pinctrl_lookup_state(serial_pinctrl, PINCTRL_SLEEP);
-				if (IS_ERR_OR_NULL(serial_pinctrl_state_disable)) {
-					dev_err(&pdev->dev, "No serial_pinctrl_state_disable config specified!\n");
-				} else {
-					pr_err("%s: console select uart gpio sleep !\n", __FUNCTION__);
-					pinctrl_select_state(serial_pinctrl, serial_pinctrl_state_disable);
-				}
+				pr_err("%s: console select uart gpio sleep !\n", __FUNCTION__);
+				pinctrl_select_state(serial_pinctrl, serial_pinctrl_state_disable);
 			}
-			#endif
-			dev_info(&pdev->dev, "boot with console false\n");
-			return -ENODEV;
 		}
+		dev_info(&pdev->dev, "boot with console false\n");
 	}
-#endif
 
 	if (pdev->dev.of_node) {
 		if (drv->cons)
@@ -2755,14 +2653,6 @@ static int msm_geni_serial_sys_suspend_noirq(struct device *dev)
 	struct uart_port *uport = &port->uport;
 
 	if (uart_console(uport)) {
-		#ifdef VENDOR_EDIT
-		//Tong.Han@BSP.Kernel.Driver 2018/6/23 add for console resume exception in release build
-		#ifdef CONFIG_OPPO_DAILY_BUILD
-		if(boot_with_console() == true)
-		#else
-		if(oem_get_uartlog_status() == false || get_boot_mode() == MSM_BOOT_MODE__FACTORY)
-		#endif
-		#endif/*VENDOR_EDIT*/
 		uart_suspend_port((struct uart_driver *)uport->private_data,
 					uport);
 	} else {
@@ -2864,46 +2754,20 @@ static int __init msm_geni_serial_init(void)
 		msm_geni_console_port.uport.flags = UPF_BOOT_AUTOCONF;
 		msm_geni_console_port.uport.line = i;
 	}
-#ifndef VENDOR_EDIT
-//Nanwei.Deng@BSP.CHG.Basic 2018/05/01 add for console
+
 	ret = console_register(&msm_geni_console_driver);
-#else
-	if (boot_with_console() == true) {
-		ret = console_register(&msm_geni_console_driver);
-	} else {
-		ret = console_register(&msm_geni_console_driver_no_cons);
-	}
-#endif /* VENDOR_EDIT */
 	if (ret)
 		return ret;
 
 	ret = uart_register_driver(&msm_geni_serial_hs_driver);
 	if (ret) {
-#ifndef VENDOR_EDIT
-//Nanwei.Deng@BSP.CHG.Basic 2018/05/01 add for console
 		uart_unregister_driver(&msm_geni_console_driver);
-#else
-		if (boot_with_console() == true) {
-			uart_unregister_driver(&msm_geni_console_driver);
-		} else {
-			uart_unregister_driver(&msm_geni_console_driver_no_cons);
-		}
-#endif /* VENDOR_EDIT */
 		return ret;
 	}
 
 	ret = platform_driver_register(&msm_geni_serial_platform_driver);
 	if (ret) {
-#ifndef VENDOR_EDIT
-//Nanwei.Deng@BSP.CHG.Basic 2018/05/01 add for console
 		console_unregister(&msm_geni_console_driver);
-#else
-		if (boot_with_console() == true) {
-			console_unregister(&msm_geni_console_driver);
-		} else {
-			console_unregister(&msm_geni_console_driver_no_cons);
-		}
-#endif /* VENDOR_EDIT */
 		uart_unregister_driver(&msm_geni_serial_hs_driver);
 		return ret;
 	}
@@ -2917,17 +2781,7 @@ static void __exit msm_geni_serial_exit(void)
 {
 	platform_driver_unregister(&msm_geni_serial_platform_driver);
 	uart_unregister_driver(&msm_geni_serial_hs_driver);
-
-#ifndef VENDOR_EDIT
-//Nanwei.Deng@BSP.CHG.Basic 2018/05/01 add for console
 	console_unregister(&msm_geni_console_driver);
-#else
-	if (boot_with_console() == true) {
-		console_unregister(&msm_geni_console_driver);
-	} else {
-		console_unregister(&msm_geni_console_driver_no_cons);
-	}
-#endif /* VENDOR_EDIT */
 }
 module_exit(msm_geni_serial_exit);
 
