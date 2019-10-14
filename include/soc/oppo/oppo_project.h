@@ -83,17 +83,20 @@ typedef struct
         unsigned char                 npmicocp[OCPCOUNTMAX];
 } ProjectInfoCDTType;
 
+static inline unsigned int is_project(OPPO_PROJECT project)
+{
+	return OPPO_18041 == project;
+}
+
 #ifdef CONFIG_OPPO_COMMON_SOFT
 void init_project_version(void);
 unsigned int get_project(void);
-unsigned int is_project(OPPO_PROJECT project);
 unsigned char get_PCB_Version(void);
 unsigned char get_Modem_Version(void);
 unsigned char get_Operator_Version(void);
 #else
 unsigned int init_project_version(void) { return 0;}
 unsigned int get_project(void) { return 0;}
-unsigned int is_project(OPPO_PROJECT project) { return 0;}
 unsigned char get_PCB_Version(void) { return 0;}
 unsigned char get_Modem_Version(void) { return 0;}
 unsigned char get_Operator_Version(void) { return 0;}
