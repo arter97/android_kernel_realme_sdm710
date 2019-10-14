@@ -18,4 +18,6 @@
 	model = "Qualcomm Technologies, Inc. SDM710 SoC";
 	compatible = "qcom,sdm670";
 	qcom,board-id = <0 0>;
+	/*oppo,prjversion. first one is the count of projects*/
+	oppo,prjversion = <1 18041>;
 };

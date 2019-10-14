@@ -28,6 +28,11 @@
 #include "dsi-panel-nt36850-truly-dualmipi-wqhd-cmd.dtsi"
 #include "dsi-panel-hx8399-truly-singlemipi-fhd-video.dtsi"
 #include "dsi-panel-hx83112a-truly-singlemipi-fhd-video.dtsi"
+//#ifdef VENDOR_EDIT
+/* liping-m@PSW.MM.Display.LCD.Stability,2018/08/30,add lcd */
+#include "dsi-panel_oppo17081samsung_ams596w401_1080_2280.dtsi"
+#include "dsi-panel_oppo18081samsung_ams641rw01_1080_2340.dtsi"
+//#endif
 #include <dt-bindings/clock/mdss-10nm-pll-clk.h>
 
 &soc {
@@ -156,6 +161,10 @@
 		vddio-supply = <&pm660_l11>;
 		lab-supply = <&lcdb_ldo_vreg>;
 		ibb-supply = <&lcdb_ncp_vreg>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_dual_nt35597_truly_cmd_display: qcom,dsi-display@1 {
@@ -180,6 +189,10 @@
 		vddio-supply = <&pm660_l11>;
 		lab-supply = <&lcdb_ldo_vreg>;
 		ibb-supply = <&lcdb_ncp_vreg>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_nt35597_truly_dsc_cmd_display: qcom,dsi-display@2 {
@@ -204,6 +217,10 @@
 		vddio-supply = <&pm660_l11>;
 		lab-supply = <&lcdb_ldo_vreg>;
 		ibb-supply = <&lcdb_ncp_vreg>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_nt35597_truly_dsc_video_display: qcom,dsi-display@3 {
@@ -234,6 +251,10 @@
 		vddio-supply = <&pm660_l11>;
 		lab-supply = <&lcdb_ldo_vreg>;
 		ibb-supply = <&lcdb_ncp_vreg>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_sim_vid_display: qcom,dsi-display@4 {
@@ -252,6 +273,10 @@
 		pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
 
 		qcom,dsi-panel = <&dsi_sim_vid>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_dual_sim_vid_display: qcom,dsi-display@5 {
@@ -270,6 +295,10 @@
 		pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
 
 		qcom,dsi-panel = <&dsi_dual_sim_vid>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_sim_cmd_display: qcom,dsi-display@6 {
@@ -288,6 +317,10 @@
 		pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
 
 		qcom,dsi-panel = <&dsi_sim_cmd>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_dual_sim_cmd_display: qcom,dsi-display@7 {
@@ -306,6 +339,10 @@
 		pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
 
 		qcom,dsi-panel = <&dsi_dual_sim_cmd>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_sim_dsc_375_cmd_display: qcom,dsi-display@8 {
@@ -324,6 +361,10 @@
 		pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
 
 		qcom,dsi-panel = <&dsi_sim_dsc_375_cmd>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_dual_sim_dsc_375_cmd_display: qcom,dsi-display@9 {
@@ -342,6 +383,10 @@
 		pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
 
 		qcom,dsi-panel = <&dsi_dual_sim_dsc_375_cmd>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_dual_nt35597_video_display: qcom,dsi-display@10 {
@@ -365,6 +410,10 @@
 		vddio-supply = <&pm660_l11>;
 		lab-supply = <&lcdb_ldo_vreg>;
 		ibb-supply = <&lcdb_ncp_vreg>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_dual_nt35597_cmd_display: qcom,dsi-display@11 {
@@ -388,6 +437,10 @@
 		vddio-supply = <&pm660_l11>;
 		lab-supply = <&lcdb_ldo_vreg>;
 		ibb-supply = <&lcdb_ncp_vreg>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_rm67195_amoled_fhd_cmd_display: qcom,dsi-display@12 {
@@ -410,6 +463,10 @@
 		qcom,dsi-panel = <&dsi_rm67195_amoled_fhd_cmd>;
 		vddio-supply = <&pm660_l11>;
 		vdda-3p3-supply = <&pm660l_l6>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_nt35695b_truly_fhd_video_display: qcom,dsi-display@13 {
@@ -432,6 +489,10 @@
 		vddio-supply = <&pm660_l11>;
 		lab-supply = <&lcdb_ldo_vreg>;
 		ibb-supply = <&lcdb_ncp_vreg>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_nt35695b_truly_fhd_cmd_display: qcom,dsi-display@14 {
@@ -455,6 +516,10 @@
 		vddio-supply = <&pm660_l11>;
 		lab-supply = <&lcdb_ldo_vreg>;
 		ibb-supply = <&lcdb_ncp_vreg>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_dual_nt36850_truly_cmd_display: qcom,dsi-display@15 {
@@ -478,6 +543,10 @@
 		vddio-supply = <&pm660_l11>;
 		lab-supply = <&lcdb_ldo_vreg>;
 		ibb-supply = <&lcdb_ncp_vreg>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_hx8399_truly_cmd_display: qcom,dsi-display@16 {
@@ -501,6 +570,10 @@
 		vddio-supply = <&pm660_l11>;
 		lab-supply = <&lcdb_ldo_vreg>;
 		ibb-supply = <&lcdb_ncp_vreg>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	dsi_hx83112a_truly_video_display: qcom,dsi-display@17 {
@@ -524,6 +597,10 @@
 		vddio-supply = <&pm660_l11>;
 		lab-supply = <&lcdb_ldo_vreg>;
 		ibb-supply = <&lcdb_ncp_vreg>;
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 	};
 
 	ext_dsi_bridge_display: qcom,dsi-display@18 {
@@ -537,6 +614,10 @@
 		       <&mdss_dsi0_pll PCLK_MUX_0_CLK>;
 		clock-names = "mux_byte_clk", "mux_pixel_clk";
 
+		//#ifdef VENDOR_EDIT
+		/*mark.yao@PSW.MM.Display.LCD.Stability,2018/4/19,disable the useless node */
+		status = "disabled";
+		//#endif /* VENDOR_EDIT *
 		ports {
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -548,6 +629,54 @@
 			};
 		};
 	};
+
+	//#ifdef VENDOR_EDIT
+	/* luozeng@PSW.MM.Display.LCD.Fature,2019/03/15,support ams653tk01 */
+	dsi_oppo18041samsung_ams653tk01_1080_2340_cmd_display: qcom,dsi-display@21 {
+		compatible = "qcom,dsi-display";
+		label = "dsi_oppo18041samsung_ams653tk01_1080_2340_cmd_display";
+		qcom,display-type = "primary";
+
+		qcom,dsi-ctrl = <&mdss_dsi0>;
+		qcom,dsi-phy = <&mdss_dsi_phy0>;
+		clocks = <&mdss_dsi0_pll BYTECLK_MUX_0_CLK>,
+		       <&mdss_dsi0_pll PCLK_MUX_0_CLK>;
+		clock-names = "mux_byte_clk", "mux_pixel_clk";
+
+		pinctrl-names = "panel_active", "panel_suspend";
+		pinctrl-0 = <&sde_dsi_active &sde_te_active>;
+		pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
+		qcom,platform-te-gpio = <&tlmm 10 0>;
+		qcom,platform-reset-gpio = <&tlmm 26 0>;
+		qcom,dsi-display-active;
+
+		qcom,dsi-panel = <&dsi_oppo18041samsung_ams653tk01_1080_2340_cmd>;
+		vddio-supply = <&pm660_l8>;
+		vdda-3p3-supply = <&pm660l_l6>;
+	};
+	dsi_oppo18041samsung_ams653tk01_1080_2340_cmd_display_evt: qcom,dsi-display@22 {
+		compatible = "qcom,dsi-display";
+		label = "dsi_oppo18041samsung_ams653tk01_1080_2340_cmd_display_evt";
+		qcom,display-type = "primary";
+
+		qcom,dsi-ctrl = <&mdss_dsi0>;
+		qcom,dsi-phy = <&mdss_dsi_phy0>;
+		clocks = <&mdss_dsi0_pll BYTECLK_MUX_0_CLK>,
+		       <&mdss_dsi0_pll PCLK_MUX_0_CLK>;
+		clock-names = "mux_byte_clk", "mux_pixel_clk";
+
+		pinctrl-names = "panel_active", "panel_suspend";
+		pinctrl-0 = <&sde_dsi_active &sde_te_active>;
+		pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
+		qcom,platform-te-gpio = <&tlmm 10 0>;
+		qcom,platform-reset-gpio = <&tlmm 26 0>;
+		qcom,dsi-display-active;
+
+		qcom,dsi-panel = <&dsi_oppo18041samsung_ams653tk01_1080_2340_cmd_evt>;
+		vddio-supply = <&pm660_l8>;
+		vdda-3p3-supply = <&pm660l_l6>;
+	};
+	//#endif
 
 	sde_wb: qcom,wb-display@0 {
 		compatible = "qcom,wb-display";
@@ -569,15 +698,25 @@
 	qcom,ext-disp = <&ext_disp>;
 
 	pinctrl-names = "mdss_dp_active", "mdss_dp_sleep";
+	/* #ifdef VENDOR_EDIT */
+	/* Jianfeng.Qiu@PSW.MM.AudioDriver.Machine, 2018/10/26, Delete for audio use gpio50*/
+	/*
 	pinctrl-0 = <&sde_dp_aux_active &sde_dp_usbplug_cc_active>;
 	pinctrl-1 = <&sde_dp_aux_suspend &sde_dp_usbplug_cc_suspend>;
 	qcom,aux-en-gpio = <&tlmm 50 0>;
+	*/
+	/* #endif VENDOR_EDIT */
 	qcom,aux-sel-gpio = <&tlmm 40 0>;
 	qcom,usbplug-cc-gpio = <&tlmm 38 0>;
 };
 
 &mdss_mdp {
-	connectors = <&sde_rscc &sde_wb &sde_dp>;
+	//#ifdef VENDOR_EDIT
+	/*Liping-m@PSW.MM.Display.LCD.Feature,2018/12/21 disable dp support */
+	connectors = <&sde_rscc &sde_wb>;
+	//#else
+	//connectors = <&sde_rscc &sde_wb &sde_dp>;
+	//#endif
 };
 
 &dsi_dual_nt35597_truly_video {
@@ -955,3 +1094,27 @@
 		};
 	};
 };
+
+//#ifdef VENDOR_EDIT
+/* liping-m@PSW.MM.Display.LCD.Fature,2018/10/22,modify power supply to 3.0v */
+&dsi_panel_pwr_supply_labibb_amoled {
+	qcom,panel-supply-entry@1 {
+		qcom,supply-min-voltage = <3008000>;
+		qcom,supply-max-voltage = <3008000>;
+		qcom,supply-post-on-sleep = <0>;
+	};
+};
+
+/*liping-m@PSW.MM.Display.LCD.Feature,2018/10/22 add DisplayPort support */
+/*liping-m@PSW.MM.Display.LCD.Feature,2018/12/21 disabled DisplayPort support */
+&sde_dp{
+	status = "disabled";
+
+	pinctrl-0 = <&sde_dp_usbplug_cc_active>;
+	pinctrl-1 = <&sde_dp_usbplug_cc_suspend>;
+
+	qcom,usbplug-cc-gpio = <&tlmm 38 0>;
+	/delete-node/ qcom,aux-en-gpio;
+	/delete-node/ qcom,aux-sel-gpio;
+};
+//#endif

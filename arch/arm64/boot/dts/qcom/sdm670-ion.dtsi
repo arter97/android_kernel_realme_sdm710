@@ -56,5 +56,16 @@
 			qcom,ion-heap-type = "DMA";
 		};
 
+		/* #ifdef VENDOR_EDIT */
+		/* luhongyu@BSP.Fingerprint.Secure 2018/12/26, add for secure dsp */
+		qcom,ion-heap@14 {
+			reg = <14>;
+			qcom,ion-heap-type = "SECURE_CARVEOUT";
+			node1 {
+				memory-region = <&secure_dsp_mem>;
+				token = <0x20000000>; /* ION_FLAG_CP_CDSP */
+			};
+		};
+		/* #endif */
 	};
 };

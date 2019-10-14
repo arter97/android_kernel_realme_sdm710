@@ -27,9 +27,15 @@
 	model = "Qualcomm Technologies, Inc. SDM710 PM660 + PM660A MTP";
 	compatible = "qcom,sdm670-mtp", "qcom,sdm670", "qcom,mtp";
 	qcom,msm-id =	<360 0x0>,
-			<393 0x0>;
+			<393 0x0>,
+			//#ifdef VENDOR_EDIT
+			//Fei.Mo@PSW.BSP.Sensor 2018-12-21 add for compatibility of 670
+			<336 0x0>;
+			//#endif
 	qcom,board-id = <8 0>;
 	qcom,pmic-id = <0x0001001b 0x0001011a 0x0 0x0>,
 		       <0x0001001b 0x0002001a 0x0 0x0>,
 		       <0x0001001b 0x0202001a 0x0 0x0>;
+	/*oppo,prjversion. first one is the count of projects*/
+	oppo,prjversion = <1 18041>;
 };
