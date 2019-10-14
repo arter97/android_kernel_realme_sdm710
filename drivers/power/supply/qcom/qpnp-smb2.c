@@ -235,7 +235,7 @@ module_param_named(
  ************************************************/
 #ifdef VENDOR_EDIT
 /* Jianchao.Shi@BSP.CHG.Basic, 2018/03/02, sjc Add for using gpio as shipmode stm6620 */
-extern 	bool boot_with_console(void);
+#define boot_with_console(x) false
 static int oppo_chg_2uart_pinctrl_init(struct oppo_chg_chip *chip)
 {
 	struct smb_charger *chg = NULL;
