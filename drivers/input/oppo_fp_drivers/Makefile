@@ -19,3 +19,5 @@ obj-y        += silead_optical_fp/
 obj-y        += goodix_optical_fp/
 endif
 endif
+
+subdir-ccflags-y += -DCONFIG_OPPO_FINGERPRINT_PROJCT=18041
