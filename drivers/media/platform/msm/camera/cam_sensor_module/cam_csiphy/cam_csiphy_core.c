@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,9 +14,6 @@
 #include "cam_csiphy_core.h"
 #include "cam_csiphy_dev.h"
 #include "cam_csiphy_soc.h"
-#include "cam_common_util.h"
-#include "cam_packet_util.h"
-
 
 #include <soc/qcom/scm.h>
 #include <cam_mem_mgr.h>
@@ -33,27 +30,26 @@ static int cam_csiphy_notify_secure_mode(struct csiphy_device *csiphy_dev,
 	bool protect, int32_t offset)
 {
 	struct scm_desc desc = {0};
-	int result = -1;
 
-	if (offset >= CSIPHY_MAX_INSTANCES)
-		return -EINVAL;
+	/* Dynamically decide between two apis */
+	if (0) {
+		desc.arginfo = SCM_ARGS(2, SCM_VAL, SCM_VAL);
+		desc.args[0] = protect;
+		desc.args[1] = csiphy_dev->soc_info.index;
+
+		if (scm_call2(SCM_SIP_FNID(SCM_SVC_CAMERASS, SECURE_SYSCALL_ID),
+			&desc)) {
+			CAM_ERR(CAM_CSIPHY, "scm call to hypervisor failed");
+			return -EINVAL;
+		}
+	}
+
 	desc.arginfo = SCM_ARGS(2, SCM_VAL, SCM_VAL);
 	desc.args[0] = protect;
 	desc.args[1] = csiphy_dev->csiphy_cpas_cp_reg_mask[offset];
 
-	/*
-	 * If SECURE_SYSCALL_ID_2 is not supported
-	 * then fallback to SECURE_SYSCALL_ID
-	 */
-	result = scm_call2(SCM_SIP_FNID(SCM_SVC_CAMERASS, SECURE_SYSCALL_ID_2),
-		&desc);
-	if (result == -EOPNOTSUPP) {
-		desc.args[1] = csiphy_dev->soc_info.index;
-		CAM_ERR(CAM_CSIPHY, "SCM CALL 7 not supported fallback to 6");
-		result = scm_call2(SCM_SIP_FNID(SCM_SVC_CAMERASS,
-						SECURE_SYSCALL_ID), &desc);
-	}
-	if (result) {
+	if (scm_call2(SCM_SIP_FNID(SCM_SVC_CAMERASS, SECURE_SYSCALL_ID_2),
+		&desc)) {
 		CAM_ERR(CAM_CSIPHY, "scm call to hypervisor failed");
 		return -EINVAL;
 	}
@@ -61,7 +57,7 @@ static int cam_csiphy_notify_secure_mode(struct csiphy_device *csiphy_dev,
 	return 0;
 }
 
-static int32_t cam_csiphy_get_instance_offset(
+int32_t cam_csiphy_get_instance_offset(
 	struct csiphy_device *csiphy_dev,
 	int32_t dev_handle)
 {
@@ -115,7 +111,7 @@ void cam_csiphy_reset(struct csiphy_device *csiphy_dev)
 	}
 }
 
-static int32_t cam_csiphy_update_secure_info(
+int32_t cam_csiphy_update_secure_info(
 	struct csiphy_device *csiphy_dev,
 	struct cam_csiphy_info  *cam_cmd_csiphy_info,
 	struct cam_config_dev_cmd *cfg_dev)
@@ -164,13 +160,12 @@ int32_t cam_cmd_buf_parser(struct csiphy_device *csiphy_dev,
 	struct cam_config_dev_cmd *cfg_dev)
 {
 	int32_t                 rc = 0;
-	uintptr_t                generic_ptr;
+	uint64_t                generic_ptr;
 	struct cam_packet       *csl_packet = NULL;
 	struct cam_cmd_buf_desc *cmd_desc = NULL;
 	uint32_t                *cmd_buf = NULL;
 	struct cam_csiphy_info  *cam_cmd_csiphy_info = NULL;
 	size_t                  len;
-	size_t                  remain_len;
 
 	if (!cfg_dev || !csiphy_dev) {
 		CAM_ERR(CAM_CSIPHY, "Invalid Args");
@@ -178,48 +173,31 @@ int32_t cam_cmd_buf_parser(struct csiphy_device *csiphy_dev,
 	}
 
 	rc = cam_mem_get_cpu_buf((int32_t) cfg_dev->packet_handle,
-		&generic_ptr, &len);
+		(uint64_t *)&generic_ptr, &len);
 	if (rc < 0) {
 		CAM_ERR(CAM_CSIPHY, "Failed to get packet Mem address: %d", rc);
 		return rc;
 	}
 
-	remain_len = len;
-	if ((sizeof(struct cam_packet) > len) ||
-		((size_t)cfg_dev->offset >= len - sizeof(struct cam_packet))) {
+	if (cfg_dev->offset > len) {
 		CAM_ERR(CAM_CSIPHY,
 			"offset is out of bounds: offset: %lld len: %zu",
 			cfg_dev->offset, len);
 		return -EINVAL;
 	}
 
-	remain_len -= (size_t)cfg_dev->offset;
-	csl_packet = (struct cam_packet *)
-		(generic_ptr + (uint32_t)cfg_dev->offset);
-
-	if (cam_packet_util_validate_packet(csl_packet,
-		remain_len)) {
-		CAM_ERR(CAM_CSIPHY, "Invalid packet params");
-		return -EINVAL;
-	}
+	csl_packet = (struct cam_packet *)(generic_ptr + cfg_dev->offset);
 
 	cmd_desc = (struct cam_cmd_buf_desc *)
 		((uint32_t *)&csl_packet->payload +
 		csl_packet->cmd_buf_offset / 4);
 
 	rc = cam_mem_get_cpu_buf(cmd_desc->mem_handle,
-		&generic_ptr, &len);
+		(uint64_t *)&generic_ptr, &len);
 	if (rc < 0) {
 		CAM_ERR(CAM_CSIPHY,
 			"Failed to get cmd buf Mem address : %d", rc);
 		return rc;
-	}
-
-	if ((len < sizeof(struct cam_csiphy_info)) ||
-		(cmd_desc->offset > (len - sizeof(struct cam_csiphy_info)))) {
-		CAM_ERR(CAM_CSIPHY,
-			"Not enough buffer provided for cam_cisphy_info");
-		return -EINVAL;
 	}
 
 	cmd_buf = (uint32_t *)generic_ptr;
@@ -283,7 +261,7 @@ irqreturn_t cam_csiphy_irq(int irq_num, void *data)
 
 	if (!csiphy_dev) {
 		CAM_ERR(CAM_CSIPHY, "Invalid Args");
-		return IRQ_NONE;
+		return -EINVAL;
 	}
 
 	soc_info = &csiphy_dev->soc_info;
@@ -402,14 +380,12 @@ int32_t cam_csiphy_config_dev(struct csiphy_device *csiphy_dev)
 			continue;
 		}
 
-		settle_cnt = div64_u64(csiphy_dev->csiphy_info.settle_time,
-			200000000);
+		settle_cnt = (csiphy_dev->csiphy_info.settle_time / 200000000);
 		if (csiphy_dev->csiphy_info.combo_mode == 1 &&
 			(lane_pos >= 3))
 			settle_cnt =
-				div64_u64(csiphy_dev->csiphy_info.
-					settle_time_combo_sensor,
-					200000000);
+			(csiphy_dev->csiphy_info.settle_time_combo_sensor /
+				200000000);
 		for (i = 0; i < cfg_size; i++) {
 			switch (reg_array[lane_pos][i].csiphy_param_type) {
 			case CSIPHY_LANE_ENABLE:
@@ -436,10 +412,8 @@ int32_t cam_csiphy_config_dev(struct csiphy_device *csiphy_dev)
 				CAM_DBG(CAM_CSIPHY, "Do Nothing");
 			break;
 			}
-			if (reg_array[lane_pos][i].delay > 0) {
-				usleep_range(reg_array[lane_pos][i].delay*1000,
-					reg_array[lane_pos][i].delay*1000 + 10);
-			}
+			usleep_range(reg_array[lane_pos][i].delay*1000,
+				reg_array[lane_pos][i].delay*1000 + 1000);
 		}
 		lane_mask >>= 1;
 		lane_pos++;
@@ -509,7 +483,7 @@ static int32_t cam_csiphy_external_cmd(struct csiphy_device *csiphy_dev,
 	int32_t rc = 0;
 
 	if (copy_from_user(&cam_cmd_csiphy_info,
-		u64_to_user_ptr(p_submit_cmd->packet_handle),
+		(void __user *)p_submit_cmd->packet_handle,
 		sizeof(struct cam_csiphy_info))) {
 		CAM_ERR(CAM_CSIPHY, "failed to copy cam_csiphy_info\n");
 		rc = -EFAULT;
@@ -569,7 +543,7 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 		struct cam_create_dev_hdl bridge_params;
 
 		rc = copy_from_user(&csiphy_acq_dev,
-			u64_to_user_ptr(cmd->handle),
+			(void __user *)cmd->handle,
 			sizeof(csiphy_acq_dev));
 		if (rc < 0) {
 			CAM_ERR(CAM_CSIPHY, "Failed copying from User");
@@ -579,7 +553,7 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 		csiphy_acq_params.combo_mode = 0;
 
 		if (copy_from_user(&csiphy_acq_params,
-			u64_to_user_ptr(csiphy_acq_dev.info_handle),
+			(void __user *)csiphy_acq_dev.info_handle,
 			sizeof(csiphy_acq_params))) {
 			CAM_ERR(CAM_CSIPHY,
 				"Failed copying from User");
@@ -635,7 +609,7 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 		bridge_intf->session_hdl[csiphy_acq_params.combo_mode] =
 			csiphy_acq_dev.session_handle;
 
-		if (copy_to_user(u64_to_user_ptr(cmd->handle),
+		if (copy_to_user((void __user *)cmd->handle,
 				&csiphy_acq_dev,
 				sizeof(struct cam_sensor_acquire_dev))) {
 			CAM_ERR(CAM_CSIPHY, "Failed copying from User");
@@ -653,7 +627,7 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 		struct cam_csiphy_query_cap csiphy_cap = {0};
 
 		cam_csiphy_query_cap(csiphy_dev, &csiphy_cap);
-		if (copy_to_user(u64_to_user_ptr(cmd->handle),
+		if (copy_to_user((void __user *)cmd->handle,
 			&csiphy_cap, sizeof(struct cam_csiphy_query_cap))) {
 			CAM_ERR(CAM_CSIPHY, "Failed copying from User");
 			rc = -EINVAL;
@@ -665,7 +639,7 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 		int32_t offset, rc = 0;
 		struct cam_start_stop_dev_cmd config;
 
-		rc = copy_from_user(&config, u64_to_user_ptr(cmd->handle),
+		rc = copy_from_user(&config, (void __user *)cmd->handle,
 					sizeof(config));
 		if (rc < 0) {
 			CAM_ERR(CAM_CSIPHY, "Failed copying from User");
@@ -731,8 +705,7 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 			goto release_mutex;
 		}
 
-		if (copy_from_user(&release,
-			u64_to_user_ptr(cmd->handle),
+		if (copy_from_user(&release, (void __user *) cmd->handle,
 			sizeof(release))) {
 			rc = -EFAULT;
 			goto release_mutex;
@@ -758,20 +731,12 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 
 		if (csiphy_dev->acquire_count == 0)
 			csiphy_dev->csiphy_state = CAM_CSIPHY_INIT;
-
-		if (csiphy_dev->config_count == 0) {
-			CAM_DBG(CAM_CSIPHY, "reset csiphy_info");
-			csiphy_dev->csiphy_info.lane_mask = 0;
-			csiphy_dev->csiphy_info.lane_cnt = 0;
-			csiphy_dev->csiphy_info.combo_mode = 0;
-		}
 	}
 		break;
 	case CAM_CONFIG_DEV: {
 		struct cam_config_dev_cmd config;
 
-		if (copy_from_user(&config,
-			u64_to_user_ptr(cmd->handle),
+		if (copy_from_user(&config, (void __user *)cmd->handle,
 					sizeof(config))) {
 			rc = -EFAULT;
 		} else {
@@ -789,7 +754,7 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 		struct cam_start_stop_dev_cmd config;
 		int32_t offset;
 
-		rc = copy_from_user(&config, u64_to_user_ptr(cmd->handle),
+		rc = copy_from_user(&config, (void __user *)cmd->handle,
 			sizeof(config));
 		if (rc < 0) {
 			CAM_ERR(CAM_CSIPHY, "Failed copying from User");
@@ -853,7 +818,7 @@ int32_t cam_csiphy_core_cfg(void *phy_dev,
 		struct cam_config_dev_cmd submit_cmd;
 
 		if (copy_from_user(&submit_cmd,
-			u64_to_user_ptr(cmd->handle),
+			(void __user *)cmd->handle,
 			sizeof(struct cam_config_dev_cmd))) {
 			CAM_ERR(CAM_CSIPHY, "failed copy config ext\n");
 			rc = -EFAULT;

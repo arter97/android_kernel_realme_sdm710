@@ -152,6 +152,22 @@ enum msm_camera_power_seq_type {
 	SENSOR_SEQ_TYPE_MAX,
 };
 
+#ifdef VENDOR_EDIT
+/*Jindian.Guan@Camera.Driver, 2019/01/04, add for [malloc imx586 qsc memory early]*/
+enum cam_sensor_i2creg_type {
+    SENSOR_INIT,
+    SENSOR_RES,
+    SENSOR_START,
+    SENSOR_STOP,
+    SENSOR_MASTER,
+    SENSOR_SLAVE,
+    SENSOR_AEC,
+    SENSOR_SPC,
+    SENSOR_PDAF,
+    SENSOR_AWB,
+};
+#endif
+
 enum cam_sensor_packet_opcodes {
 	CAM_SENSOR_PACKET_OPCODE_SENSOR_STREAMON,
 	CAM_SENSOR_PACKET_OPCODE_SENSOR_UPDATE,
@@ -275,6 +291,10 @@ struct i2c_settings_list {
 	struct cam_sensor_i2c_reg_setting i2c_settings;
 	enum cam_sensor_i2c_cmd_type op_code;
 	struct list_head list;
+	#ifdef VENDOR_EDIT
+	/*Jindian.Guan@Camera.Driver, 2019/01/04, add for [malloc imx586 qsc memory early]*/
+	uint32_t resident;
+	#endif
 };
 
 struct i2c_settings_array {
@@ -307,6 +327,14 @@ struct cam_camera_slave_info {
 	uint16_t sensor_id_reg_addr;
 	uint16_t sensor_id;
 	uint16_t sensor_id_mask;
+	#ifdef VENDOR_EDIT
+	/*add by hongbo.dai@camera 20180831, for support multi camera resource*/
+	uint16_t eeprom_slave_addr;
+	uint16_t vendor_id;
+	uint16_t camera_id;
+	/*add by yufeng@camera, 20181222 for support multi  sensor version*/
+	uint16_t sensor_version;
+	#endif
 };
 
 struct msm_sensor_init_params {
@@ -319,9 +347,6 @@ enum msm_sensor_camera_id_t {
 	CAMERA_1,
 	CAMERA_2,
 	CAMERA_3,
-	CAMERA_4,
-	CAMERA_5,
-	CAMERA_6,
 	MAX_CAMERAS,
 };
 
@@ -357,6 +382,10 @@ struct cam_sensor_board_info {
 	int32_t  subdev_intf[SUB_MODULE_MAX];
 	const char *misc_regulator;
 	struct cam_sensor_power_ctrl_t power_info;
+#ifdef VENDOR_EDIT
+	/*Jinshui.Liu@Camera.Driver, 2018/06/23, add for [tof watchdog]*/
+	int32_t watchdog_gpio;
+#endif
 };
 
 enum msm_camera_vreg_name_t {

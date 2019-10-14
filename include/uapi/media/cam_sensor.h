@@ -64,6 +64,21 @@ struct cam_actuator_query_cap {
 	uint32_t            reserved;
 } __attribute__((packed));
 
+#ifdef VENDOR_EDIT
+/*Modified by Yingpiao.Lin@Cam.Drv, 20180717, for iris flow*/
+/**
+ * struct cam_actuator_query_cap - capabilities info for actuator
+ *
+ * @slot_info        :  Indicates about the slotId or cell Index
+ * @reserved
+ */
+struct cam_iris_setting {
+	uint32_t            apertureControl;
+	int32_t             get_hall_value;
+	uint32_t            reserved;
+} __attribute__((packed));
+#endif
+
 /**
  * struct cam_eeprom_query_cap_t - capabilities info for eeprom
  *
@@ -473,5 +488,56 @@ struct cam_flash_query_cap_info {
 	uint32_t    max_duration_flash[CAM_FLASH_MAX_LED_TRIGGERS];
 	uint32_t    max_current_torch[CAM_FLASH_MAX_LED_TRIGGERS];
 } __attribute__ ((packed));
+
+#ifdef VENDOR_EDIT
+/*Jindian.Guan@Camera.Drv, 20181207, add for imx471 DFCT info*/
+#define FD_DFCT_MAX_NUM 5
+#define SG_DFCT_MAX_NUM 299
+
+struct sony_dfct_tbl_t {
+	//---- single static defect ----
+	int sg_dfct_num;		// the number of single static defect
+	int sg_dfct_addr[SG_DFCT_MAX_NUM];		// [ u25 ( upper-u13 = x-addr, lower-u12 = y-addr ) ]
+	//---- FD static defect ----
+	int fd_dfct_num;		// the number of FD static defect
+	int fd_dfct_addr[FD_DFCT_MAX_NUM];		// [ u25 ( upper-u13 = x-addr, lower-u12 = y-addr ) ]
+} __attribute__ ((packed));
+#endif
+#ifdef VENDOR_EDIT
+/*add by yufeng@camera, 20190115 for write eeprom*/
+#define CALIB_DATA_LENGTH         1561
+//add by yufeng@camera, 20190212 for write eeprom
+#define WRITE_DATA_MAX_LENGTH     8
+#define WRITE_DATA_DELAY          5
+
+struct cam_write_eeprom_t {
+    uint32_t cam_id;
+    uint32_t baseAddr;
+    uint32_t calibDataSize;
+    uint32_t isWRP;
+    uint32_t WRPaddr;
+    unsigned char calibData[CALIB_DATA_LENGTH];
+} __attribute__ ((packed));
+#endif
+
+#ifdef VENDOR_EDIT
+//add by yufeng@camera, 20190115 for read eeprom SN
+#define EEPROM_SN_SIZE 17
+struct read_eeprom_SN_t{
+    uint32_t cam_id;
+    uint32_t baseAddr;
+    uint32_t SNSize;
+    unsigned char eepromSN[EEPROM_SN_SIZE];
+} __attribute__ ((packed));
+//add by yufeng@camera, 20190216 for check eeprom data
+#define EEPROM_CHECK_DATA_MAX_SIZE 196
+struct check_eeprom_data_t{
+    uint32_t cam_id;
+    uint32_t startAddr;
+    uint32_t eepromData_checksum;
+} __attribute__ ((packed));
+
+#endif
+
 
 #endif

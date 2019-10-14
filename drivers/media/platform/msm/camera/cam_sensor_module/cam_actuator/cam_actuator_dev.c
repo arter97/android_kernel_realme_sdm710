@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,6 +15,16 @@
 #include "cam_actuator_soc.h"
 #include "cam_actuator_core.h"
 #include "cam_trace.h"
+#ifdef VENDOR_EDIT
+/*Added by Jinshui.Liu@Camera 20161125 for [debug interface]*/
+#include <linux/proc_fs.h>
+#endif
+
+#ifdef VENDOR_EDIT
+/*Jinshui.Liu@Camera.Driver, 2018/06/22, add for [Iris debug]*/
+struct cam_actuator_ctrl_t *g_a_ctrl = NULL;
+int Iris_value = 0;
+#endif
 
 static long cam_actuator_subdev_ioctl(struct v4l2_subdev *sd,
 	unsigned int cmd, void *arg)
@@ -137,6 +147,192 @@ static int cam_actuator_init_subdev(struct cam_actuator_ctrl_t *a_ctrl)
 	return rc;
 }
 
+#ifdef VENDOR_EDIT
+/*Modified by Yingpiao.Lin@Cam.Drv, 20180717, for iris flow*/
+static ssize_t actuator_proc_write(struct file *filp, const char __user *buff,
+	size_t len, loff_t *data)
+{
+	char buf[32] = {0};
+	uint16_t read_write_flag = 0;
+	uint16_t store_sid = 0;
+	unsigned long buf_value;
+	int rc = 0;
+	struct cam_sensor_i2c_reg_setting write_setting;
+	struct cam_sensor_i2c_reg_array reg_setting[10];
+
+	if (!g_a_ctrl || g_a_ctrl->cam_act_state == CAM_ACTUATOR_INIT) {
+		if (g_a_ctrl)
+			CAM_ERR(CAM_ACTUATOR, "actuator_state %d", g_a_ctrl->cam_act_state);
+		return len;
+	}
+
+	if (len > 32)
+		len = 32;
+	if (copy_from_user(buf, buff, len)) {
+		CAM_ERR(CAM_ACTUATOR, "proc write copy_from_user error ");
+		return -EFAULT;
+	}
+	buf_value = simple_strtoul(buf, NULL, 16);
+	read_write_flag = buf_value;
+
+	if (Iris_value == read_write_flag) {
+		return len;
+	} else {
+		Iris_value = read_write_flag;
+	}
+
+	/*1 init, 2 small, 3 large*/
+	if (read_write_flag == 1) {
+		reg_setting[0].reg_addr = 0xae;
+		reg_setting[0].reg_data = 0x3b;
+		reg_setting[0].delay = 0;
+		reg_setting[0].data_mask = 0;
+		reg_setting[1].reg_addr = 0x02;
+		reg_setting[1].reg_data = 0x00;
+		reg_setting[1].delay = 0;
+		reg_setting[1].data_mask = 0;
+		reg_setting[2].reg_addr = 0xa6;
+		reg_setting[2].reg_data = 0x7b;
+		reg_setting[2].delay = 10;
+		reg_setting[2].data_mask = 0;
+		reg_setting[3].reg_addr = 0xa6;
+		reg_setting[3].reg_data = 0x00;
+		reg_setting[3].delay = 15;
+		reg_setting[3].data_mask = 0;
+	} else if (read_write_flag == 2) {
+		reg_setting[0].reg_addr = 0xa6;
+		reg_setting[0].reg_data = 0x7b;
+		reg_setting[0].delay = 10;
+		reg_setting[0].data_mask = 0;
+		reg_setting[1].reg_addr = 0x00;
+		reg_setting[1].reg_data = 0xff;
+		reg_setting[1].delay = 0;
+		reg_setting[1].data_mask = 0;
+		reg_setting[2].reg_addr = 0x01;
+		reg_setting[2].reg_data = 0xc0;
+		reg_setting[2].delay = 0;
+		reg_setting[2].data_mask = 0;
+		reg_setting[3].reg_addr = 0xa6;
+		reg_setting[3].reg_data = 0x00;
+		reg_setting[3].delay = 15;
+		reg_setting[3].data_mask = 0;
+	} else if (read_write_flag == 3) {
+		reg_setting[0].reg_addr = 0xa6;
+		reg_setting[0].reg_data = 0x7b;
+		reg_setting[0].delay = 10;
+		reg_setting[0].data_mask = 0;
+		reg_setting[1].reg_addr = 0x00;
+		reg_setting[1].reg_data = 0x00;
+		reg_setting[1].delay = 0;
+		reg_setting[1].data_mask = 0;
+		reg_setting[2].reg_addr = 0x01;
+		reg_setting[2].reg_data = 0x00;
+		reg_setting[2].delay = 0;
+		reg_setting[2].data_mask = 0;
+		reg_setting[3].reg_addr = 0xa6;
+		reg_setting[3].reg_data = 0x00;
+		reg_setting[3].delay = 15;
+		reg_setting[3].data_mask = 0;
+	} else {
+		CAM_ERR(CAM_ACTUATOR, "unsupported type!!");
+		return len;
+	}
+
+	write_setting.addr_type = CAMERA_SENSOR_I2C_TYPE_BYTE;
+	write_setting.data_type = CAMERA_SENSOR_I2C_TYPE_BYTE;
+	write_setting.delay = 1;
+	write_setting.size = 1;
+	write_setting.reg_setting = &reg_setting[0];
+	store_sid = g_a_ctrl->io_master_info.cci_client->sid;
+	g_a_ctrl->io_master_info.cci_client->sid = 0x98 >> 1;
+	rc = camera_io_dev_write(&g_a_ctrl->io_master_info,
+		&write_setting);
+	g_a_ctrl->io_master_info.cci_client->sid = store_sid;;
+	if (rc < 0) {
+		CAM_ERR(CAM_ACTUATOR, "read/write err");
+	}
+
+	write_setting.addr_type = CAMERA_SENSOR_I2C_TYPE_BYTE;
+	write_setting.data_type = CAMERA_SENSOR_I2C_TYPE_BYTE;
+	write_setting.delay = 1;
+	write_setting.size = 1;
+	write_setting.reg_setting = &reg_setting[1];
+	store_sid = g_a_ctrl->io_master_info.cci_client->sid;
+	g_a_ctrl->io_master_info.cci_client->sid = 0x98 >> 1;
+	rc = camera_io_dev_write(&g_a_ctrl->io_master_info,
+		&write_setting);
+	g_a_ctrl->io_master_info.cci_client->sid = store_sid;;
+	if (rc < 0) {
+		CAM_ERR(CAM_ACTUATOR, "read/write err");
+	}
+
+	write_setting.addr_type = CAMERA_SENSOR_I2C_TYPE_BYTE;
+	write_setting.data_type = CAMERA_SENSOR_I2C_TYPE_BYTE;
+	write_setting.delay = 10;
+	write_setting.size = 1;
+	write_setting.reg_setting = &reg_setting[2];
+	store_sid = g_a_ctrl->io_master_info.cci_client->sid;
+	g_a_ctrl->io_master_info.cci_client->sid = 0x98 >> 1;
+	rc = camera_io_dev_write(&g_a_ctrl->io_master_info,
+		&write_setting);
+	g_a_ctrl->io_master_info.cci_client->sid = store_sid;;
+	if (rc < 0) {
+		CAM_ERR(CAM_ACTUATOR, "read/write err");
+	}
+
+	write_setting.addr_type = CAMERA_SENSOR_I2C_TYPE_BYTE;
+	write_setting.data_type = CAMERA_SENSOR_I2C_TYPE_BYTE;
+	write_setting.delay = 15;
+	write_setting.size = 1;
+	write_setting.reg_setting = &reg_setting[3];
+	store_sid = g_a_ctrl->io_master_info.cci_client->sid;
+	g_a_ctrl->io_master_info.cci_client->sid = 0x98 >> 1;
+	rc = camera_io_dev_write(&g_a_ctrl->io_master_info,
+		&write_setting);
+	g_a_ctrl->io_master_info.cci_client->sid = store_sid;;
+	if (rc < 0) {
+		CAM_ERR(CAM_ACTUATOR, "read/write err");
+	}
+
+	return len;
+}
+
+static ssize_t actuator_proc_read(struct file *filp, char __user *buff,
+	size_t len, loff_t *data)
+{
+	if (!g_a_ctrl || g_a_ctrl->cam_act_state == CAM_ACTUATOR_INIT) {
+		if (g_a_ctrl)
+			CAM_ERR(CAM_ACTUATOR, "actuator_state %d", g_a_ctrl->cam_act_state);
+		return 0;
+	}
+
+	CAM_ERR(CAM_ACTUATOR, "slave 0x%02x",
+		g_a_ctrl->io_master_info.cci_client->sid);
+	return 0;
+}
+
+static const struct file_operations actuator_fops = {
+	.owner = THIS_MODULE,
+	.read = actuator_proc_read,
+	.write = actuator_proc_write,
+};
+
+static int cam_actuator_proc_init(void)
+{
+	int ret = 0;
+
+	struct proc_dir_entry *proc_entry;
+
+	proc_entry = proc_create_data( "Iris_debug", 0666, NULL, &actuator_fops, NULL);
+	if (proc_entry == NULL) {
+		ret = -ENOMEM;
+		CAM_ERR(CAM_ACTUATOR, "Error! Couldn't create qcom_actuator proc entry");
+	}
+
+	return ret;
+}
+#endif
+
 static int32_t cam_actuator_driver_i2c_probe(struct i2c_client *client,
 	const struct i2c_device_id *id)
 {
@@ -252,11 +448,15 @@ static int32_t cam_actuator_platform_remove(struct platform_device *pdev)
 	a_ctrl->io_master_info.cci_client = NULL;
 	kfree(power_info->power_setting);
 	kfree(power_info->power_down_setting);
-	power_info->power_setting = NULL;
-	power_info->power_down_setting = NULL;
 	kfree(a_ctrl->soc_info.soc_private);
 	kfree(a_ctrl->i2c_data.per_frame);
 	a_ctrl->i2c_data.per_frame = NULL;
+	#ifdef VENDOR_EDIT
+	/*Modified by Yingpiao.Lin@Cam.Drv, 20180717, for iris flow*/
+	if (a_ctrl->piris_ctrl) {
+		devm_kfree(&pdev->dev, a_ctrl->piris_ctrl);
+	}
+	#endif
 	devm_kfree(&pdev->dev, a_ctrl);
 
 	return rc;
@@ -286,8 +486,6 @@ static int32_t cam_actuator_driver_i2c_remove(struct i2c_client *client)
 	kfree(power_info->power_setting);
 	kfree(power_info->power_down_setting);
 	kfree(a_ctrl->soc_info.soc_private);
-	power_info->power_setting = NULL;
-	power_info->power_down_setting = NULL;
 	a_ctrl->soc_info.soc_private = NULL;
 	kfree(a_ctrl);
 	return rc;
@@ -376,6 +574,24 @@ static int32_t cam_actuator_driver_platform_probe(
 	v4l2_set_subdevdata(&a_ctrl->v4l2_dev_str.sd, a_ctrl);
 	a_ctrl->cam_act_state = CAM_ACTUATOR_INIT;
 
+#ifdef VENDOR_EDIT
+	/*Modified by Yingpiao.Lin@Cam.Drv, 20180717, for iris flow*/
+	if (a_ctrl->soc_info.index == 0) {
+		a_ctrl->piris_ctrl = devm_kzalloc(&pdev->dev,
+			sizeof(struct cam_actuator_ctrl_t), GFP_KERNEL);
+		if (a_ctrl->piris_ctrl) {
+			memcpy(a_ctrl->piris_ctrl, a_ctrl, sizeof(struct cam_actuator_ctrl_t));
+		} else {
+			CAM_ERR(CAM_ACTUATOR, "a_ctrl->piris_ctrl is NULL");
+		}
+		g_a_ctrl = a_ctrl;
+		cam_actuator_proc_init();
+	}
+
+	/*Added by Zhengrong.Zhang@Cam.Drv, 2018/11/08, for update ak7374 PID*/
+	a_ctrl->is_check_firmware_update = 1;
+#endif
+
 	return rc;
 
 free_mem:
@@ -385,6 +601,12 @@ free_soc:
 free_cci_client:
 	kfree(a_ctrl->io_master_info.cci_client);
 free_ctrl:
+#ifdef VENDOR_EDIT
+	/*Modified by Yingpiao.Lin@Cam.Drv, 20180717, for iris flow*/
+	if (a_ctrl->piris_ctrl) {
+		devm_kfree(&pdev->dev, a_ctrl->piris_ctrl);
+	}
+#endif
 	devm_kfree(&pdev->dev, a_ctrl);
 	return rc;
 }
@@ -397,7 +619,6 @@ static struct platform_driver cam_actuator_platform_driver = {
 		.name = "qcom,actuator",
 		.owner = THIS_MODULE,
 		.of_match_table = cam_actuator_driver_dt_match,
-		.suppress_bind_attrs = true,
 	},
 	.remove = cam_actuator_platform_remove,
 };

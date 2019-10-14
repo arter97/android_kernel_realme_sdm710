@@ -34,8 +34,6 @@
 
 #define SYNC_LINK_SOF_CNT_MAX_LMT 1
 
-#define MAXIMUM_LINKS_PER_SESSION  4
-
 /**
  * enum crm_workq_task_type
  * @codes: to identify which type of task is present
@@ -47,7 +45,6 @@ enum crm_workq_task_type {
 	CRM_WORKQ_TASK_APPLY_REQ,
 	CRM_WORKQ_TASK_NOTIFY_SOF,
 	CRM_WORKQ_TASK_NOTIFY_ERR,
-	CRM_WORKQ_TASK_NOTIFY_FREEZE,
 	CRM_WORKQ_TASK_SCHED_REQ,
 	CRM_WORKQ_TASK_FLUSH_REQ,
 	CRM_WORKQ_TASK_INVALID,
@@ -129,16 +126,15 @@ enum cam_req_mgr_link_state {
 
 /**
  * struct cam_req_mgr_traverse
- * @idx              : slot index
- * @result           : contains which all tables were able to apply successfully
- * @tbl              : pointer of pipeline delay based request table
- * @apply_data       : pointer which various tables will update during traverse
- * @in_q             : input request queue pointer
- * @validate_only    : Whether to validate only and/or update settings
- * @self_link        : To indicate whether the check is for the given link or
- *                     the other sync link
- * @inject_delay_chk : if inject delay has been validated for all pd devices
- * @open_req_cnt     : Count of open requests yet to be serviced in the kernel.
+ * @idx           : slot index
+ * @result        : contains which all tables were able to apply successfully
+ * @tbl           : pointer of pipeline delay based request table
+ * @apply_data    : pointer which various tables will update during traverse
+ * @in_q          : input request queue pointer
+ * @validate_only : Whether to validate only and/or update settings
+ * @self_link     : To indicate whether the check is for the given link or the
+ *                  other sync link
+ * @open_req_cnt  : Count of open requests yet to be serviced in the kernel.
  */
 struct cam_req_mgr_traverse {
 	int32_t                       idx;
@@ -148,8 +144,7 @@ struct cam_req_mgr_traverse {
 	struct cam_req_mgr_req_queue *in_q;
 	bool                          validate_only;
 	bool                          self_link;
-	bool                          inject_delay_chk;
-	int32_t                       open_req_cnt;
+	int32_t                      open_req_cnt;
 };
 
 /**
@@ -171,13 +166,15 @@ struct cam_req_mgr_apply {
  * @idx           : slot index
  * @req_ready_map : mask tracking which all devices have request ready
  * @state         : state machine for life cycle of a slot
- * @inject_delay  : insert extra bubbling for flash type of use cases
  */
 struct cam_req_mgr_tbl_slot {
 	int32_t             idx;
 	uint32_t            req_ready_map;
 	enum crm_req_state  state;
+#ifdef VENDOR_EDIT
+    /*add by zhenjie.li@Camera,20180525 for flash sync*/
 	uint32_t            inject_delay;
+#endif
 };
 
 /**
@@ -192,6 +189,7 @@ struct cam_req_mgr_tbl_slot {
  * @pd_delta      : differnce between this table's pipeline delay and next
  * @num_slots     : number of request slots present in the table
  * @slot          : array of slots tracking requests availability at devices
+ * @inject_delay  : insert extra bubbling for flash type of use cases
  */
 struct cam_req_mgr_req_tbl {
 	int32_t                     id;
@@ -203,6 +201,10 @@ struct cam_req_mgr_req_tbl {
 	int32_t                     pd_delta;
 	int32_t                     num_slots;
 	struct cam_req_mgr_tbl_slot slot[MAX_REQ_SLOTS];
+#ifndef VENDOR_EDIT
+    /*add by zhenjie.li@Camera,20180525 for flash sync*/
+	uint32_t                    inject_delay;
+#endif
 };
 
 /**
@@ -355,7 +357,7 @@ struct cam_req_mgr_core_link {
 struct cam_req_mgr_core_session {
 	int32_t                       session_hdl;
 	uint32_t                      num_links;
-	struct cam_req_mgr_core_link *links[MAXIMUM_LINKS_PER_SESSION];
+	struct cam_req_mgr_core_link *links[MAX_LINKS_PER_SESSION];
 	struct list_head              entry;
 	struct mutex                  lock;
 	int32_t                       force_err_recovery;

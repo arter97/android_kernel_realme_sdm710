@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -14,6 +14,14 @@
 #include "cam_sensor_util.h"
 #include <cam_mem_mgr.h>
 #include "cam_res_mgr_api.h"
+
+#ifdef VENDOR_EDIT
+/*Jindian.Guan@Camera.Driver, 2019/01/04, add for [malloc imx586 qsc memory early]*/
+extern struct i2c_settings_list *i2c_settings_list_vendor;
+extern struct cam_sensor_i2c_reg_array *reg_setting_vendor;
+extern uint32_t vendor_size;
+#endif
+
 
 #define CAM_SENSOR_PINCTRL_STATE_SLEEP "cam_suspend"
 #define CAM_SENSOR_PINCTRL_STATE_DEFAULT "cam_default"
@@ -49,6 +57,61 @@ static struct i2c_settings_list*
 	return tmp;
 }
 
+#ifdef VENDOR_EDIT
+/*Jindian.Guan@Camera.Driver, 2019/01/04, add for [malloc imx586 qsc memory early]*/
+static struct i2c_settings_list*
+	cam_sensor_get_i2c_ptr_vendor(struct i2c_settings_array *i2c_reg_settings,
+		uint32_t size, uint16_t vendor_mode)
+{
+	struct i2c_settings_list *tmp;
+	if (vendor_mode == SENSOR_SPC && vendor_size == size && reg_setting_vendor != NULL && i2c_settings_list_vendor != NULL) {
+		tmp = i2c_settings_list_vendor;
+		tmp->i2c_settings.reg_setting = reg_setting_vendor;
+		tmp->resident = 1;
+		list_add_tail(&(tmp->list),
+			&(i2c_reg_settings->list_head));
+		CAM_DBG(CAM_SENSOR, "spc malloc second list %p, reg %p, size %d",i2c_settings_list_vendor,reg_setting_vendor,vendor_size);
+	} else {
+		if (reg_setting_vendor) {
+			kfree(reg_setting_vendor);
+			reg_setting_vendor = NULL;
+			vendor_size = 0;
+		}
+
+		if (i2c_settings_list_vendor) {
+			kfree(i2c_settings_list_vendor);
+			i2c_settings_list_vendor = NULL;
+		}
+
+		tmp = (struct i2c_settings_list *)
+			kzalloc(sizeof(struct i2c_settings_list), GFP_KERNEL);
+
+		if (tmp != NULL)
+			list_add_tail(&(tmp->list),
+			    &(i2c_reg_settings->list_head));
+		else
+			return NULL;
+
+		reg_setting_vendor = (struct cam_sensor_i2c_reg_array *)
+			kzalloc(sizeof(struct cam_sensor_i2c_reg_array) *
+			size, GFP_KERNEL);
+		if (reg_setting_vendor == NULL) {
+			list_del(&(tmp->list));
+			kfree(tmp);
+			return NULL;
+		}
+		tmp->i2c_settings.reg_setting = reg_setting_vendor;
+		tmp->resident = 1;
+		i2c_settings_list_vendor = tmp;
+		vendor_size = size;
+		CAM_DBG(CAM_SENSOR, "spc malloc first %p,size %d",tmp->i2c_settings.reg_setting,vendor_size);
+	}
+	tmp->i2c_settings.size = size;
+
+	return tmp;
+}
+#endif
+
 int32_t delete_request(struct i2c_settings_array *i2c_array)
 {
 	struct i2c_settings_list *i2c_list = NULL, *i2c_next = NULL;
@@ -61,9 +124,20 @@ int32_t delete_request(struct i2c_settings_array *i2c_array)
 
 	list_for_each_entry_safe(i2c_list, i2c_next,
 		&(i2c_array->list_head), list) {
+		#ifdef VENDOR_EDIT
+		/*Jindian.Guan@Camera.Driver, 2019/01/04, add for [malloc imx586 qsc memory early]*/
+		if (i2c_list->resident) {
+		    list_del(&(i2c_list->list));
+		}else {
+		    kfree(i2c_list->i2c_settings.reg_setting);
+		    list_del(&(i2c_list->list));
+		    kfree(i2c_list);
+		}
+		#else
 		kfree(i2c_list->i2c_settings.reg_setting);
 		list_del(&(i2c_list->list));
 		kfree(i2c_list);
+		#endif
 	}
 	INIT_LIST_HEAD(&(i2c_array->list_head));
 	i2c_array->is_settings_valid = 0;
@@ -160,8 +234,19 @@ int32_t cam_sensor_handle_random_write(
 	struct i2c_settings_list  *i2c_list;
 	int32_t rc = 0, cnt;
 
+	#ifdef VENDOR_EDIT
+	/*Jindian.Guan@Camera.Driver, 2019/01/04, add for [malloc imx586 qsc memory early]*/
+	if (cam_cmd_i2c_random_wr->header.reserved == SENSOR_SPC)
+		i2c_list = cam_sensor_get_i2c_ptr_vendor(i2c_reg_settings,
+		    cam_cmd_i2c_random_wr->header.count,cam_cmd_i2c_random_wr->header.reserved);
+	else
+		i2c_list = cam_sensor_get_i2c_ptr(i2c_reg_settings,
+		    cam_cmd_i2c_random_wr->header.count);
+	#else
 	i2c_list = cam_sensor_get_i2c_ptr(i2c_reg_settings,
 		cam_cmd_i2c_random_wr->header.count);
+	#endif
+
 	if (i2c_list == NULL ||
 		i2c_list->i2c_settings.reg_setting == NULL) {
 		CAM_ERR(CAM_SENSOR, "Failed in allocating i2c_list");
@@ -296,10 +381,8 @@ int cam_sensor_i2c_command_parser(
 {
 	int16_t                   rc = 0, i = 0;
 	size_t                    len_of_buff = 0;
-	uintptr_t                  generic_ptr;
+	uint64_t                  generic_ptr;
 	uint16_t                  cmd_length_in_bytes = 0;
-	size_t                    remain_len = 0;
-	size_t                    tot_size = 0;
 
 	for (i = 0; i < num_cmd_buffers; i++) {
 		uint32_t                  *cmd_buf = NULL;
@@ -320,35 +403,17 @@ int cam_sensor_i2c_command_parser(
 			continue;
 
 		rc = cam_mem_get_cpu_buf(cmd_desc[i].mem_handle,
-			&generic_ptr, &len_of_buff);
+			(uint64_t *)&generic_ptr, &len_of_buff);
+		cmd_buf = (uint32_t *)generic_ptr;
 		if (rc < 0) {
 			CAM_ERR(CAM_SENSOR,
-				"cmd hdl failed:%d, Err: %d, Buffer_len: %zd",
+				"cmd hdl failed:%d, Err: %d, Buffer_len: %ld",
 				cmd_desc[i].mem_handle, rc, len_of_buff);
 			return rc;
 		}
-
-		remain_len = len_of_buff;
-		if ((len_of_buff < sizeof(struct common_header)) ||
-			(cmd_desc[i].offset >
-			(len_of_buff - sizeof(struct common_header)))) {
-			CAM_ERR(CAM_SENSOR, "buffer provided too small");
-			return -EINVAL;
-		}
-		cmd_buf = (uint32_t *)generic_ptr;
 		cmd_buf += cmd_desc[i].offset / sizeof(uint32_t);
 
-		if (remain_len < cmd_desc[i].length) {
-			CAM_ERR(CAM_SENSOR, "buffer provided too small");
-			return -EINVAL;
-		}
-
 		while (byte_cnt < cmd_desc[i].length) {
-			if ((remain_len - byte_cnt) <
-				sizeof(struct common_header)) {
-				CAM_ERR(CAM_SENSOR, "Not enough buffer");
-				return -EINVAL;
-			}
 			cmm_hdr = (struct common_header *)cmd_buf;
 			generic_op_code = cmm_hdr->third_byte;
 			switch (cmm_hdr->cmd_type) {
@@ -357,22 +422,6 @@ int cam_sensor_i2c_command_parser(
 				struct cam_cmd_i2c_random_wr
 					*cam_cmd_i2c_random_wr =
 					(struct cam_cmd_i2c_random_wr *)cmd_buf;
-
-				if ((remain_len - byte_cnt) <
-					sizeof(struct cam_cmd_i2c_random_wr)) {
-					CAM_ERR(CAM_SENSOR,
-						"Not enough buffer provided");
-					return -EINVAL;
-				}
-				tot_size = sizeof(struct i2c_rdwr_header) +
-					(sizeof(struct i2c_random_wr_payload) *
-					cam_cmd_i2c_random_wr->header.count);
-
-				if (tot_size > (remain_len - byte_cnt)) {
-					CAM_ERR(CAM_SENSOR,
-						"Not enough buffer provided");
-					return -EINVAL;
-				}
 
 				rc = cam_sensor_handle_random_write(
 					cam_cmd_i2c_random_wr,
@@ -396,24 +445,6 @@ int cam_sensor_i2c_command_parser(
 				(struct cam_cmd_i2c_continuous_wr *)
 				cmd_buf;
 
-				if ((remain_len - byte_cnt) <
-				sizeof(struct cam_cmd_i2c_continuous_wr)) {
-					CAM_ERR(CAM_SENSOR,
-						"Not enough buffer provided");
-					return -EINVAL;
-				}
-
-				tot_size = sizeof(struct i2c_rdwr_header) +
-				sizeof(cam_cmd_i2c_continuous_wr->reg_addr) +
-				(sizeof(struct cam_cmd_read) *
-				cam_cmd_i2c_continuous_wr->header.count);
-
-				if (tot_size > (remain_len - byte_cnt)) {
-					CAM_ERR(CAM_SENSOR,
-						"Not enough buffer provided");
-					return -EINVAL;
-				}
-
 				rc = cam_sensor_handle_continuous_write(
 					cam_cmd_i2c_continuous_wr,
 					i2c_reg_settings,
@@ -430,16 +461,11 @@ int cam_sensor_i2c_command_parser(
 				break;
 			}
 			case CAMERA_SENSOR_CMD_TYPE_WAIT: {
-				if ((remain_len - byte_cnt) <
-				sizeof(struct cam_cmd_unconditional_wait)) {
-					CAM_ERR(CAM_SENSOR,
-						"Not enough buffer space");
-					return -EINVAL;
-				}
 				if (generic_op_code ==
 					CAMERA_SENSOR_WAIT_OP_HW_UCND ||
 					generic_op_code ==
 						CAMERA_SENSOR_WAIT_OP_SW_UCND) {
+
 					rc = cam_sensor_handle_delay(
 						&cmd_buf, generic_op_code,
 						i2c_reg_settings, j, &byte_cnt,
@@ -471,12 +497,6 @@ int cam_sensor_i2c_command_parser(
 				break;
 			}
 			case CAMERA_SENSOR_CMD_TYPE_I2C_INFO: {
-				if (remain_len - byte_cnt <
-				    sizeof(struct cam_cmd_i2c_info)) {
-					CAM_ERR(CAM_SENSOR,
-						"Not enough buffer space");
-					return -EINVAL;
-				}
 				rc = cam_sensor_handle_slave_info(
 					io_master, cmd_buf);
 				if (rc) {
@@ -504,74 +524,163 @@ int cam_sensor_i2c_command_parser(
 	return rc;
 }
 
-int cam_sensor_util_i2c_apply_setting(
-	struct camera_io_master *io_master_info,
-	struct i2c_settings_list *i2c_list)
+#ifdef VENDOR_EDIT
+/*Jindian.Guan@Camera.Driver, 2019/01/04, add for [malloc imx586 qsc memory early]*/
+int cam_sensor_i2c_command_parser_vendor(
+	struct camera_io_master *io_master,
+	struct i2c_settings_array *i2c_reg_settings,
+	struct cam_cmd_buf_desc   *cmd_desc,
+	int32_t num_cmd_buffers,
+	uint16_t vendor_mode)
 {
-	int32_t rc = 0;
-	uint32_t i, size;
+	int16_t                   rc = 0, i = 0;
+	size_t                    len_of_buff = 0;
+	uint64_t                  generic_ptr;
+	uint16_t                  cmd_length_in_bytes = 0;
 
-	switch (i2c_list->op_code) {
-	case CAM_SENSOR_I2C_WRITE_RANDOM: {
-		rc = camera_io_dev_write(io_master_info,
-			&(i2c_list->i2c_settings));
+	for (i = 0; i < num_cmd_buffers; i++) {
+		uint32_t                  *cmd_buf = NULL;
+		struct common_header      *cmm_hdr;
+		uint16_t                  generic_op_code;
+		uint32_t                  byte_cnt = 0;
+		uint32_t                  j = 0;
+		struct list_head          *list = NULL;
+
+		/*
+		 * It is not expected the same settings to
+		 * be spread across multiple cmd buffers
+		 */
+		CAM_DBG(CAM_SENSOR, "Total cmd Buf in Bytes: %d",
+			cmd_desc[i].length);
+
+		if (!cmd_desc[i].length)
+			continue;
+
+		rc = cam_mem_get_cpu_buf(cmd_desc[i].mem_handle,
+			(uint64_t *)&generic_ptr, &len_of_buff);
+		cmd_buf = (uint32_t *)generic_ptr;
 		if (rc < 0) {
 			CAM_ERR(CAM_SENSOR,
-				"Failed to random write I2C settings: %d",
-				rc);
+				"cmd hdl failed:%d, Err: %d, Buffer_len: %ld",
+				cmd_desc[i].mem_handle, rc, len_of_buff);
 			return rc;
 		}
-	break;
-	}
-	case CAM_SENSOR_I2C_WRITE_SEQ: {
-		rc = camera_io_dev_write_continuous(
-			io_master_info, &(i2c_list->i2c_settings), 0);
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR,
-				"Failed to seq write I2C settings: %d",
-				rc);
-			return rc;
-		}
-	break;
-	}
-	case CAM_SENSOR_I2C_WRITE_BURST: {
-		rc = camera_io_dev_write_continuous(
-			io_master_info, &(i2c_list->i2c_settings), 1);
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR,
-				"Failed to burst write I2C settings: %d",
-				rc);
-			return rc;
-		}
-	break;
-	}
-	case CAM_SENSOR_I2C_POLL: {
-		size = i2c_list->i2c_settings.size;
-		for (i = 0; i < size; i++) {
-			rc = camera_io_dev_poll(
-			io_master_info,
-			i2c_list->i2c_settings.reg_setting[i].reg_addr,
-			i2c_list->i2c_settings.reg_setting[i].reg_data,
-			i2c_list->i2c_settings.reg_setting[i].data_mask,
-			i2c_list->i2c_settings.addr_type,
-			i2c_list->i2c_settings.data_type,
-			i2c_list->i2c_settings.reg_setting[i].delay);
-			if (rc < 0) {
-				CAM_ERR(CAM_SENSOR,
-					"i2c poll apply setting Fail: %d", rc);
-				return rc;
+		cmd_buf += cmd_desc[i].offset / sizeof(uint32_t);
+
+		while (byte_cnt < cmd_desc[i].length) {
+			cmm_hdr = (struct common_header *)cmd_buf;
+			generic_op_code = cmm_hdr->third_byte;
+			switch (cmm_hdr->cmd_type) {
+			case CAMERA_SENSOR_CMD_TYPE_I2C_RNDM_WR: {
+				uint16_t cmd_length_in_bytes   = 0;
+				struct cam_cmd_i2c_random_wr
+					*cam_cmd_i2c_random_wr =
+					(struct cam_cmd_i2c_random_wr *)cmd_buf;
+
+				cam_cmd_i2c_random_wr->header.reserved = vendor_mode;
+
+				rc = cam_sensor_handle_random_write(
+					cam_cmd_i2c_random_wr,
+					i2c_reg_settings,
+					&cmd_length_in_bytes, &j, &list);
+				if (rc < 0) {
+					CAM_ERR(CAM_SENSOR,
+					"Failed in random write %d", rc);
+					return rc;
+				}
+
+				cmd_buf += cmd_length_in_bytes /
+					sizeof(uint32_t);
+				byte_cnt += cmd_length_in_bytes;
+				break;
+			}
+			case CAMERA_SENSOR_CMD_TYPE_I2C_CONT_WR: {
+				uint16_t cmd_length_in_bytes   = 0;
+				struct cam_cmd_i2c_continuous_wr
+				*cam_cmd_i2c_continuous_wr =
+				(struct cam_cmd_i2c_continuous_wr *)
+				cmd_buf;
+
+				rc = cam_sensor_handle_continuous_write(
+					cam_cmd_i2c_continuous_wr,
+					i2c_reg_settings,
+					&cmd_length_in_bytes, &j, &list);
+				if (rc < 0) {
+					CAM_ERR(CAM_SENSOR,
+					"Failed in continuous write %d", rc);
+					return rc;
+				}
+
+				cmd_buf += cmd_length_in_bytes /
+					sizeof(uint32_t);
+				byte_cnt += cmd_length_in_bytes;
+				break;
+			}
+			case CAMERA_SENSOR_CMD_TYPE_WAIT: {
+				if (generic_op_code ==
+					CAMERA_SENSOR_WAIT_OP_HW_UCND ||
+					generic_op_code ==
+						CAMERA_SENSOR_WAIT_OP_SW_UCND) {
+
+					rc = cam_sensor_handle_delay(
+						&cmd_buf, generic_op_code,
+						i2c_reg_settings, j, &byte_cnt,
+						list);
+					if (rc < 0) {
+						CAM_ERR(CAM_SENSOR,
+							"delay hdl failed: %d",
+							rc);
+						return rc;
+					}
+
+				} else if (generic_op_code ==
+					CAMERA_SENSOR_WAIT_OP_COND) {
+					rc = cam_sensor_handle_poll(
+						&cmd_buf, i2c_reg_settings,
+						&byte_cnt, &j, &list);
+					if (rc < 0) {
+						CAM_ERR(CAM_SENSOR,
+							"Random read fail: %d",
+							rc);
+						return rc;
+					}
+				} else {
+					CAM_ERR(CAM_SENSOR,
+						"Wrong Wait Command: %d",
+						generic_op_code);
+					return -EINVAL;
+				}
+				break;
+			}
+			case CAMERA_SENSOR_CMD_TYPE_I2C_INFO: {
+				rc = cam_sensor_handle_slave_info(
+					io_master, cmd_buf);
+				if (rc) {
+					CAM_ERR(CAM_SENSOR,
+						"Handle slave info failed with rc: %d",
+						rc);
+					return rc;
+				}
+				cmd_length_in_bytes =
+					sizeof(struct cam_cmd_i2c_info);
+				cmd_buf +=
+					cmd_length_in_bytes / sizeof(uint32_t);
+				byte_cnt += cmd_length_in_bytes;
+				break;
+			}
+			default:
+				CAM_ERR(CAM_SENSOR, "Invalid Command Type:%d",
+					 cmm_hdr->cmd_type);
+				return -EINVAL;
 			}
 		}
-	break;
-	}
-	default:
-		CAM_ERR(CAM_SENSOR, "Wrong Opcode: %d", i2c_list->op_code);
-		rc = -EINVAL;
-	break;
+		i2c_reg_settings->is_settings_valid = 1;
 	}
 
 	return rc;
 }
+
+#endif
 
 int32_t msm_camera_fill_vreg_params(
 	struct cam_hw_soc_info *soc_info,
@@ -815,32 +924,8 @@ int cam_sensor_util_request_gpio_table(
 	return rc;
 }
 
-
-static int32_t cam_sensor_validate(void *ptr, size_t remain_buf)
-{
-	struct common_header *cmm_hdr = (struct common_header *)ptr;
-	size_t validate_size = 0;
-
-	if (remain_buf < sizeof(struct common_header))
-		return -EINVAL;
-
-	if (cmm_hdr->cmd_type == CAMERA_SENSOR_CMD_TYPE_PWR_UP ||
-		cmm_hdr->cmd_type == CAMERA_SENSOR_CMD_TYPE_PWR_DOWN)
-		validate_size = sizeof(struct cam_cmd_power);
-	else if (cmm_hdr->cmd_type == CAMERA_SENSOR_CMD_TYPE_WAIT)
-		validate_size = sizeof(struct cam_cmd_unconditional_wait);
-
-	if (remain_buf < validate_size) {
-		CAM_ERR(CAM_SENSOR, "Invalid cmd_buf len %zu min %zu",
-			remain_buf, validate_size);
-		return -EINVAL;
-	}
-	return 0;
-}
-
 int32_t cam_sensor_update_power_settings(void *cmd_buf,
-	uint32_t cmd_length, struct cam_sensor_power_ctrl_t *power_info,
-	size_t cmd_buf_len)
+	int cmd_length, struct cam_sensor_power_ctrl_t *power_info)
 {
 	int32_t rc = 0, tot_size = 0, last_cmd_type = 0;
 	int32_t i = 0, pwr_up = 0, pwr_down = 0;
@@ -849,8 +934,7 @@ int32_t cam_sensor_update_power_settings(void *cmd_buf,
 	struct cam_cmd_power *pwr_cmd = (struct cam_cmd_power *)cmd_buf;
 	struct common_header *cmm_hdr = (struct common_header *)cmd_buf;
 
-	if (!pwr_cmd || !cmd_length || cmd_buf_len < (size_t)cmd_length ||
-		cam_sensor_validate(cmd_buf, cmd_buf_len)) {
+	if (!pwr_cmd || !cmd_length) {
 		CAM_ERR(CAM_SENSOR, "Invalid Args: pwr_cmd %pK, cmd_length: %d",
 			pwr_cmd, cmd_length);
 		return -EINVAL;
@@ -870,35 +954,22 @@ int32_t cam_sensor_update_power_settings(void *cmd_buf,
 		kzalloc(sizeof(struct cam_sensor_power_setting) *
 			MAX_POWER_CONFIG, GFP_KERNEL);
 	if (!power_info->power_down_setting) {
-		kfree(power_info->power_setting);
-		power_info->power_setting = NULL;
-		power_info->power_setting_size = 0;
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto free_power_settings;
 	}
 
 	while (tot_size < cmd_length) {
-		if (cam_sensor_validate(ptr, (cmd_length - tot_size))) {
-			rc = -EINVAL;
-			goto free_power_settings;
-		}
 		if (cmm_hdr->cmd_type ==
 			CAMERA_SENSOR_CMD_TYPE_PWR_UP) {
 			struct cam_cmd_power *pwr_cmd =
 				(struct cam_cmd_power *)ptr;
 
 			power_info->power_setting_size += pwr_cmd->count;
-			if (power_info->power_setting_size > MAX_POWER_CONFIG) {
-				CAM_ERR(CAM_SENSOR,
-					"Invalid: power up setting size %d",
-					power_info->power_setting_size);
-				rc = -EINVAL;
-				goto free_power_settings;
-			}
 			scr = ptr + sizeof(struct cam_cmd_power);
 			tot_size = tot_size + sizeof(struct cam_cmd_power);
 
 			if (pwr_cmd->count == 0)
-				CAM_WARN(CAM_SENSOR, "pwr_up_size is zero");
+				CAM_WARN(CAM_SENSOR, "Un expected Command");
 
 			for (i = 0; i < pwr_cmd->count; i++, pwr_up++) {
 				power_info->power_setting[pwr_up].seq_type =
@@ -918,7 +989,7 @@ int32_t cam_sensor_update_power_settings(void *cmd_buf,
 					CAM_ERR(CAM_SENSOR,
 						"Error: Cmd Buffer is wrong");
 					rc = -EINVAL;
-					goto free_power_settings;
+					goto free_power_down_settings;
 				}
 				CAM_DBG(CAM_SENSOR,
 				"Seq Type[%d]: %d Config_val: %ld", pwr_up,
@@ -986,17 +1057,9 @@ int32_t cam_sensor_update_power_settings(void *cmd_buf,
 			scr = ptr + sizeof(struct cam_cmd_power);
 			tot_size = tot_size + sizeof(struct cam_cmd_power);
 			power_info->power_down_setting_size += pwr_cmd->count;
-			if (power_info->power_down_setting_size >
-				MAX_POWER_CONFIG) {
-				CAM_ERR(CAM_SENSOR,
-					"Invalid: power down setting size %d",
-					power_info->power_down_setting_size);
-				rc = -EINVAL;
-				goto free_power_settings;
-			}
 
 			if (pwr_cmd->count == 0)
-				CAM_ERR(CAM_SENSOR, "pwr_down size is zero");
+				CAM_ERR(CAM_SENSOR, "Invalid Command");
 
 			for (i = 0; i < pwr_cmd->count; i++, pwr_down++) {
 				pwr_settings =
@@ -1020,7 +1083,7 @@ int32_t cam_sensor_update_power_settings(void *cmd_buf,
 					CAM_ERR(CAM_SENSOR,
 						"Command Buffer is wrong");
 					rc = -EINVAL;
-					goto free_power_settings;
+					goto free_power_down_settings;
 				}
 				CAM_DBG(CAM_SENSOR,
 					"Seq Type[%d]: %d Config_val: %ld",
@@ -1034,19 +1097,14 @@ int32_t cam_sensor_update_power_settings(void *cmd_buf,
 			CAM_ERR(CAM_SENSOR,
 				"Error: Un expected Header Type: %d",
 				cmm_hdr->cmd_type);
-			rc = -EINVAL;
-			goto free_power_settings;
 		}
 	}
 
 	return rc;
-free_power_settings:
+free_power_down_settings:
 	kfree(power_info->power_down_setting);
+free_power_settings:
 	kfree(power_info->power_setting);
-	power_info->power_down_setting = NULL;
-	power_info->power_setting = NULL;
-	power_info->power_down_setting_size = 0;
-	power_info->power_setting_size = 0;
 	return rc;
 }
 
@@ -1401,24 +1459,6 @@ int msm_camera_pinctrl_init(
 	return 0;
 }
 
-int cam_sensor_bob_pwm_mode_switch(struct cam_hw_soc_info *soc_info,
-	int bob_reg_idx, bool flag)
-{
-	int rc = 0;
-	uint32_t op_current =
-		(flag == true) ? soc_info->rgltr_op_mode[bob_reg_idx] : 0;
-
-	if (soc_info->rgltr[bob_reg_idx] != NULL) {
-		rc = regulator_set_load(soc_info->rgltr[bob_reg_idx],
-			op_current);
-		if (rc)
-			CAM_WARN(CAM_SENSOR,
-				"BoB PWM SetLoad failed rc: %d", rc);
-	}
-
-	return rc;
-}
-
 int msm_cam_sensor_handle_reg_gpio(int seq_type,
 	struct msm_camera_gpio_num_info *gpio_num_info, int val)
 {
@@ -1444,62 +1484,10 @@ int msm_cam_sensor_handle_reg_gpio(int seq_type,
 	return 0;
 }
 
-static int cam_config_mclk_reg(struct cam_sensor_power_ctrl_t *ctrl,
-	struct cam_hw_soc_info *soc_info, int32_t index)
-{
-	int32_t num_vreg = 0, j = 0, rc = 0, idx = 0;
-	struct cam_sensor_power_setting *ps = NULL;
-	struct cam_sensor_power_setting *pd = NULL;
-
-	num_vreg = soc_info->num_rgltr;
-
-	pd = &ctrl->power_down_setting[index];
-
-	for (j = 0; j < num_vreg; j++) {
-		if (!strcmp(soc_info->rgltr_name[j], "cam_clk")) {
-			ps = NULL;
-			for (idx = 0; idx < ctrl->power_setting_size; idx++) {
-				if (ctrl->power_setting[idx].seq_type ==
-					pd->seq_type) {
-					ps = &ctrl->power_setting[idx];
-					break;
-				}
-			}
-
-			if (ps != NULL) {
-				CAM_DBG(CAM_SENSOR, "Disable MCLK Regulator");
-				rc = cam_soc_util_regulator_disable(
-					soc_info->rgltr[j],
-					soc_info->rgltr_name[j],
-					soc_info->rgltr_min_volt[j],
-					soc_info->rgltr_max_volt[j],
-					soc_info->rgltr_op_mode[j],
-					soc_info->rgltr_delay[j]);
-
-				if (rc) {
-					CAM_ERR(CAM_SENSOR,
-						"MCLK REG DISALBE FAILED: %d",
-						rc);
-					return rc;
-				}
-
-				ps->data[0] =
-					soc_info->rgltr[j];
-
-				regulator_put(
-					soc_info->rgltr[j]);
-				soc_info->rgltr[j] = NULL;
-			}
-		}
-	}
-
-	return rc;
-}
-
 int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 		struct cam_hw_soc_info *soc_info)
 {
-	int rc = 0, index = 0, no_gpio = 0, ret = 0, num_vreg, j = 0, i = 0;
+	int rc = 0, index = 0, no_gpio = 0, ret = 0, num_vreg, j = 0;
 	int32_t vreg_idx = -1;
 	struct cam_sensor_power_setting *power_setting = NULL;
 	struct msm_camera_gpio_num_info *gpio_num_info = NULL;
@@ -1558,13 +1546,6 @@ int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 	for (index = 0; index < ctrl->power_setting_size; index++) {
 		CAM_DBG(CAM_SENSOR, "index: %d", index);
 		power_setting = &ctrl->power_setting[index];
-		if (!power_setting) {
-			CAM_ERR(CAM_SENSOR,
-				"Invalid power up settings for index %d",
-				index);
-			return -EINVAL;
-		}
-
 		CAM_DBG(CAM_SENSOR, "seq_type %d", power_setting->seq_type);
 
 		switch (power_setting->seq_type) {
@@ -1596,7 +1577,6 @@ int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 							soc_info->rgltr_name[j],
 							rc);
 						soc_info->rgltr[j] = NULL;
-						goto power_up_failed;
 					}
 
 					rc =  cam_soc_util_regulator_enable(
@@ -1606,11 +1586,7 @@ int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 					soc_info->rgltr_max_volt[j],
 					soc_info->rgltr_op_mode[j],
 					soc_info->rgltr_delay[j]);
-					if (rc) {
-						CAM_ERR(CAM_SENSOR,
-							"Reg enable failed");
-						goto power_up_failed;
-					}
+
 					power_setting->data[0] =
 						soc_info->rgltr[j];
 				}
@@ -1691,7 +1667,6 @@ int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 						rc);
 
 					soc_info->rgltr[vreg_idx] = NULL;
-					goto power_up_failed;
 				}
 
 				rc =  cam_soc_util_regulator_enable(
@@ -1701,12 +1676,7 @@ int cam_sensor_core_power_up(struct cam_sensor_power_ctrl_t *ctrl,
 					soc_info->rgltr_max_volt[vreg_idx],
 					soc_info->rgltr_op_mode[vreg_idx],
 					soc_info->rgltr_delay[vreg_idx]);
-				if (rc) {
-					CAM_ERR(CAM_SENSOR,
-						"Reg Enable failed for %s",
-						soc_info->rgltr_name[vreg_idx]);
-					goto power_up_failed;
-				}
+
 				power_setting->data[0] =
 						soc_info->rgltr[vreg_idx];
 			}
@@ -1749,18 +1719,6 @@ power_up_failed:
 		CAM_DBG(CAM_SENSOR, "type %d",
 			power_setting->seq_type);
 		switch (power_setting->seq_type) {
-		case SENSOR_MCLK:
-			for (i = soc_info->num_clk - 1; i >= 0; i--) {
-				cam_soc_util_clk_disable(soc_info->clk[i],
-					soc_info->clk_name[i]);
-			}
-			ret = cam_config_mclk_reg(ctrl, soc_info, index);
-			if (ret < 0) {
-				CAM_ERR(CAM_SENSOR,
-					"config clk reg failed rc: %d", ret);
-				continue;
-			}
-			break;
 		case SENSOR_RESET:
 		case SENSOR_STANDBY:
 		case SENSOR_CUSTOM_GPIO1:
@@ -1793,21 +1751,11 @@ power_up_failed:
 					soc_info->rgltr_op_mode[vreg_idx],
 					soc_info->rgltr_delay[vreg_idx]);
 
-				if (rc) {
-					CAM_ERR(CAM_SENSOR,
-					"Fail to disalbe reg: %s",
-					soc_info->rgltr_name[vreg_idx]);
-					soc_info->rgltr[vreg_idx] = NULL;
-					msm_cam_sensor_handle_reg_gpio(
-						power_setting->seq_type,
-						gpio_num_info,
-						GPIOF_OUT_INIT_LOW);
-					continue;
-				}
 				power_setting->data[0] =
 						soc_info->rgltr[vreg_idx];
 
-				regulator_put(soc_info->rgltr[vreg_idx]);
+				regulator_put(
+					soc_info->rgltr[vreg_idx]);
 				soc_info->rgltr[vreg_idx] = NULL;
 			}
 			else
@@ -1833,12 +1781,12 @@ power_up_failed:
 
 	if (ctrl->cam_pinctrl_status) {
 		ret = pinctrl_select_state(
-			ctrl->pinctrl_info.pinctrl,
-			ctrl->pinctrl_info.gpio_state_suspend);
+				ctrl->pinctrl_info.pinctrl,
+				ctrl->pinctrl_info.gpio_state_suspend);
 		if (ret)
 			CAM_ERR(CAM_SENSOR, "cannot set pin to suspend state");
 		cam_res_mgr_shared_pinctrl_select_state(false);
-		devm_pinctrl_put(ctrl->pinctrl_info.pinctrl);
+		pinctrl_put(ctrl->pinctrl_info.pinctrl);
 		cam_res_mgr_shared_pinctrl_put();
 	}
 
@@ -1873,12 +1821,60 @@ msm_camera_get_power_settings(struct cam_sensor_power_ctrl_t *ctrl,
 	return ps;
 }
 
-int cam_sensor_util_power_down(struct cam_sensor_power_ctrl_t *ctrl,
+static int cam_config_mclk_reg(struct cam_sensor_power_ctrl_t *ctrl,
+	struct cam_hw_soc_info *soc_info, int32_t index)
+{
+	int32_t num_vreg = 0, j = 0, rc = 0, idx = 0;
+	struct cam_sensor_power_setting *ps = NULL;
+	struct cam_sensor_power_setting *pd = NULL;
+
+	num_vreg = soc_info->num_rgltr;
+
+	pd = &ctrl->power_down_setting[index];
+
+	for (j = 0; j < num_vreg; j++) {
+		if (!strcmp(soc_info->rgltr_name[j], "cam_clk")) {
+
+			ps = NULL;
+			for (idx = 0; idx <
+				ctrl->power_setting_size; idx++) {
+				if (ctrl->power_setting[idx].
+					seq_type == pd->seq_type) {
+					ps = &ctrl->power_setting[idx];
+					break;
+				}
+			}
+
+			if (ps != NULL) {
+				CAM_DBG(CAM_SENSOR, "Disable Regulator");
+
+				rc = cam_soc_util_regulator_disable(
+					soc_info->rgltr[j],
+					soc_info->rgltr_name[j],
+					soc_info->rgltr_min_volt[j],
+					soc_info->rgltr_max_volt[j],
+					soc_info->rgltr_op_mode[j],
+					soc_info->rgltr_delay[j]);
+
+				ps->data[0] =
+					soc_info->rgltr[j];
+
+				regulator_put(
+					soc_info->rgltr[j]);
+				soc_info->rgltr[j] = NULL;
+			}
+		}
+	}
+
+	return rc;
+}
+
+int msm_camera_power_down(struct cam_sensor_power_ctrl_t *ctrl,
 		struct cam_hw_soc_info *soc_info)
 {
 	int index = 0, ret = 0, num_vreg = 0, i;
 	struct cam_sensor_power_setting *pd = NULL;
-	struct cam_sensor_power_setting *ps = NULL;
+	struct cam_sensor_power_setting *ps;
 	struct msm_camera_gpio_num_info *gpio_num_info = NULL;
 
 	CAM_DBG(CAM_SENSOR, "Enter");
@@ -1895,37 +1891,25 @@ int cam_sensor_util_power_down(struct cam_sensor_power_ctrl_t *ctrl,
 		return -EINVAL;
 	}
 
-	if (ctrl->power_down_setting_size > MAX_POWER_CONFIG) {
-		CAM_ERR(CAM_SENSOR, "Invalid: power setting size %d",
-			ctrl->power_setting_size);
-		return -EINVAL;
-	}
-
 	for (index = 0; index < ctrl->power_down_setting_size; index++) {
-		CAM_DBG(CAM_SENSOR, "power_down_index %d",  index);
+		CAM_DBG(CAM_SENSOR, "index %d",  index);
 		pd = &ctrl->power_down_setting[index];
-		if (!pd) {
-			CAM_ERR(CAM_SENSOR,
-				"Invalid power down settings for index %d",
-				index);
-			return -EINVAL;
-		}
-
 		ps = NULL;
-		CAM_DBG(CAM_SENSOR, "seq_type %d",  pd->seq_type);
+		CAM_DBG(CAM_SENSOR, "type %d",  pd->seq_type);
 		switch (pd->seq_type) {
 		case SENSOR_MCLK:
+			ret = cam_config_mclk_reg(ctrl, soc_info, index);
+			if (ret < 0) {
+				CAM_ERR(CAM_SENSOR,
+					"config clk reg failed rc: %d", ret);
+				return ret;
+			}
+			//cam_soc_util_clk_disable_default(soc_info);
 			for (i = soc_info->num_clk - 1; i >= 0; i--) {
 				cam_soc_util_clk_disable(soc_info->clk[i],
 					soc_info->clk_name[i]);
 			}
 
-			ret = cam_config_mclk_reg(ctrl, soc_info, index);
-			if (ret < 0) {
-				CAM_ERR(CAM_SENSOR,
-					"config clk reg failed rc: %d", ret);
-				continue;
-			}
 			break;
 		case SENSOR_RESET:
 		case SENSOR_STANDBY:
@@ -1965,19 +1949,7 @@ int cam_sensor_util_power_down(struct cam_sensor_power_ctrl_t *ctrl,
 					soc_info->rgltr_max_volt[ps->seq_val],
 					soc_info->rgltr_op_mode[ps->seq_val],
 					soc_info->rgltr_delay[ps->seq_val]);
-					if (ret) {
-						CAM_ERR(CAM_SENSOR,
-						"Reg: %s disable failed",
-						soc_info->rgltr_name[
-							ps->seq_val]);
-						soc_info->rgltr[ps->seq_val] =
-							NULL;
-						msm_cam_sensor_handle_reg_gpio(
-							pd->seq_type,
-							gpio_num_info,
-							GPIOF_OUT_INIT_LOW);
-						continue;
-					}
+
 					ps->data[0] =
 						soc_info->rgltr[ps->seq_val];
 
@@ -2021,7 +1993,7 @@ int cam_sensor_util_power_down(struct cam_sensor_power_ctrl_t *ctrl,
 			CAM_ERR(CAM_SENSOR, "cannot set pin to suspend state");
 
 		cam_res_mgr_shared_pinctrl_select_state(false);
-		devm_pinctrl_put(ctrl->pinctrl_info.pinctrl);
+		pinctrl_put(ctrl->pinctrl_info.pinctrl);
 		cam_res_mgr_shared_pinctrl_put();
 	}
 

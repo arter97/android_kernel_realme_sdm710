@@ -218,7 +218,6 @@ static struct platform_driver cam_jpeg_enc_driver = {
 		.name = "cam-jpeg-enc",
 		.owner = THIS_MODULE,
 		.of_match_table = cam_jpeg_enc_dt_match,
-		.suppress_bind_attrs = true,
 	},
 };
 
