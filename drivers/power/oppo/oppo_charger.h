@@ -44,7 +44,7 @@
 #include <linux/qpnp/qpnp-adc.h>
 #include <soc/oppo/boot_mode.h>
 #ifdef CONFIG_OPPO_SDM670P_CHARGER
-#include "../../../kernel/msm-4.9/drivers/power/supply/qcom/smb-lib.h"
+#include "../drivers/power/supply/qcom/smb-lib.h"
 
 #endif /* CONFIG_OPPO_SDM670P_CHARGER */
 
