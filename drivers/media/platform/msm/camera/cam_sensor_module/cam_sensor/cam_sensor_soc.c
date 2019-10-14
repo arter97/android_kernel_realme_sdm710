@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -18,6 +18,10 @@
 #include <cam_req_mgr_util.h>
 #include "cam_sensor_soc.h"
 #include "cam_soc_util.h"
+#ifdef VENDOR_EDIT
+/*Jinshui.Liu@Camera.Driver, 2018/08/20, add for [distinguish 18181 EVT2 or after from before]*/
+#include <soc/oppo/oppo_project.h>
+#endif
 
 int32_t cam_sensor_get_sub_module_index(struct device_node *of_node,
 	struct cam_sensor_board_info *s_info)
@@ -98,28 +102,12 @@ int32_t cam_sensor_get_sub_module_index(struct device_node *of_node,
 	else
 		sensor_info->subdev_id[SUB_MODULE_CSIPHY] = val;
 
-	src_node = of_parse_phandle(of_node, "ir-led-src", 0);
-	if (!src_node) {
-		CAM_DBG(CAM_SENSOR, " src_node NULL");
-	} else {
-		rc = of_property_read_u32(src_node, "cell-index", &val);
-		CAM_DBG(CAM_SENSOR, "ir led cell index %d, rc %d", val, rc);
-		if (rc < 0) {
-			CAM_ERR(CAM_SENSOR, "failed %d", rc);
-			of_node_put(src_node);
-			return rc;
-		}
-		sensor_info->subdev_id[SUB_MODULE_IR_LED] = val;
-		of_node_put(src_node);
-	}
-
 	return rc;
 }
 
 static int32_t cam_sensor_driver_get_dt_data(struct cam_sensor_ctrl_t *s_ctrl)
 {
 	int32_t rc = 0;
-	int i = 0;
 	struct cam_sensor_board_info *sensordata = NULL;
 	struct device_node *of_node = s_ctrl->of_node;
 	struct cam_hw_soc_info *soc_info = &s_ctrl->soc_info;
@@ -151,33 +139,6 @@ static int32_t cam_sensor_driver_get_dt_data(struct cam_sensor_ctrl_t *s_ctrl)
 		goto FREE_SENSOR_DATA;
 	}
 
-	/* Store the index of BoB regulator if it is available */
-	for (i = 0; i < soc_info->num_rgltr; i++) {
-		if (!strcmp(soc_info->rgltr_name[i],
-			"cam_bob")) {
-			CAM_DBG(CAM_SENSOR,
-				"i: %d cam_bob", i);
-			s_ctrl->bob_reg_index = i;
-			soc_info->rgltr[i] = devm_regulator_get(soc_info->dev,
-				soc_info->rgltr_name[i]);
-			if (IS_ERR_OR_NULL(soc_info->rgltr[i])) {
-				CAM_WARN(CAM_SENSOR,
-					"Regulator: %s get failed",
-					soc_info->rgltr_name[i]);
-				soc_info->rgltr[i] = NULL;
-			} else {
-				if (!of_property_read_bool(of_node,
-					"pwm-switch")) {
-					CAM_DBG(CAM_SENSOR,
-					"No BoB PWM switch param defined");
-					s_ctrl->bob_pwm_switch = false;
-				} else {
-					s_ctrl->bob_pwm_switch = true;
-				}
-			}
-		}
-	}
-
 	/* Read subdev info */
 	rc = cam_sensor_get_sub_module_index(of_node, sensordata);
 	if (rc < 0) {
@@ -198,6 +159,23 @@ static int32_t cam_sensor_driver_get_dt_data(struct cam_sensor_ctrl_t *s_ctrl)
 			rc = 0;
 		}
 	}
+
+#ifdef VENDOR_EDIT
+	/*Jinshui.Liu@Camera.Driver, 2018/06/23, add for [tof watchdog]*/
+	/*Jinshui.Liu@Camera.Driver, 2018/08/20, modify for [distinguish 18181 EVT2 or after from before]*/
+	if (get_project() == OPPO_18181
+		&& (get_Modem_Version() == 7)) {
+		sensordata->watchdog_gpio = of_get_named_gpio(of_node, "watchdog-gpio", 0);
+		if (!gpio_is_valid(sensordata->watchdog_gpio)) {
+			CAM_ERR(CAM_SENSOR, "invalid watchdog_gpio %d", sensordata->watchdog_gpio);
+			sensordata->watchdog_gpio = -1;
+		} else {
+			CAM_INFO(CAM_SENSOR, "watchdog_gpio %d", sensordata->watchdog_gpio);
+		}
+	} else {
+		sensordata->watchdog_gpio = -1;
+	}
+#endif
 
 	if (of_property_read_u32(of_node, "sensor-position-pitch",
 		&sensordata->pos_pitch) < 0) {
