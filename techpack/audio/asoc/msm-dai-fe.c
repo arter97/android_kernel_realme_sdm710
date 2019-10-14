@@ -964,6 +964,19 @@ static struct snd_soc_dai_driver msm_fe_dais[] = {
 			.rate_min = 8000,
 			.rate_max = 48000,
 		},
+		#ifdef VENDOR_EDIT
+		/*Jianfeng.Qiu@PSW.MM.AudioDriver.Machine, 2017/02/20, Add for loopback test*/
+		.playback = {
+			.stream_name = "INT3 MI2S_TX Hostless Playback",
+			.aif_name = "INT3_MI2S_DL_HL_MMI",
+			.rates = SNDRV_PCM_RATE_8000_48000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE,
+			.channels_min = 1,
+			.channels_max = 2,
+			.rate_min = 8000,
+			.rate_max = 48000,
+		},
+		#endif /* VENDOR_EDIT */
 		.ops = &msm_fe_dai_ops,
 		.name = "INT3_MI2S_TX_HOSTLESS",
 		.probe = fe_dai_probe,

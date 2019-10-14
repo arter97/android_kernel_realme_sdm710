@@ -58,7 +58,14 @@
 #define SPK_PMD 2
 #define SPK_PMU 3
 
+#ifndef VENDOR_EDIT
+/*Jianfeng.Qiu@PSW.MM.AudioDriver.HeadsetDet, 2018/05/21,
+ *Modify for micbias output voltage 2.7v.
+ */
 #define MICBIAS_DEFAULT_VAL 1800000
+#else /* VENDOR_EDIT */
+#define MICBIAS_DEFAULT_VAL 2700000
+#endif /* VENDOR_EDIT */
 #define MICBIAS_MIN_VAL 1600000
 #define MICBIAS_STEP_SIZE 50000
 
@@ -200,6 +207,12 @@ static void msm_anlg_cdc_set_auto_zeroing(struct snd_soc_codec *codec,
 static void msm_anlg_cdc_configure_cap(struct snd_soc_codec *codec,
 				       bool micbias1, bool micbias2);
 static bool msm_anlg_cdc_use_mb(struct snd_soc_codec *codec);
+#ifdef VENDOR_EDIT
+/*Jianfeng.Qiu@PSW.MM.AudioDriver.Codec, 2018/07/31,
+ *Add for set different micbias voltage.
+ */
+void msm_anlg_cdc_set_micb_v_switch(struct snd_soc_codec *codec, u32 voltage);
+#endif /* VENDOR_EDIT */
 
 static int get_codec_version(struct sdm660_cdc_priv *sdm660_cdc)
 {
@@ -488,6 +501,13 @@ static int msm_anlg_cdc_mbhc_map_btn_code_to_num(struct snd_soc_codec *codec)
 		btn = -EINVAL;
 		break;
 	};
+
+	#ifdef VENDOR_EDIT
+	/* Jianfeng.Qiu@PSW.MM.AudioDriver.HeadsetDet, 2017/04/07,
+	 * Add for headset button log.
+	 */
+	pr_info("%s: btn is %d", __func__, btn);
+	#endif /* VENDOR_EDIT */
 
 	return btn;
 }
@@ -914,6 +934,12 @@ static const struct wcd_mbhc_cb mbhc_cb = {
 	.trim_btn_reg = msm_anlg_cdc_trim_btn_reg,
 	.compute_impedance = msm_anlg_cdc_mbhc_calc_impedance,
 	.set_micbias_value = msm_anlg_cdc_set_micb_v,
+	#ifdef VENDOR_EDIT
+	/*Jianfeng.Qiu@PSW.MM.AudioDriver.Codec, 2018/07/31,
+	 *Add for set different micbias voltage.
+	 */
+	.set_micbias_value_switch = msm_anlg_cdc_set_micb_v_switch,
+	#endif /* VENDOR_EDIT */
 	.set_auto_zeroing = msm_anlg_cdc_set_auto_zeroing,
 	.get_hwdep_fw_cal = msm_anlg_cdc_get_hwdep_fw_cal,
 	.set_cap_mode = msm_anlg_cdc_configure_cap,
@@ -1578,6 +1604,112 @@ static int msm_anlg_cdc_ear_pa_boost_set(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+#ifdef VENDOR_EDIT
+/*Jianfeng.Qiu@PSW.MM.AudioDriver.FTM.954616, 2016/08/24,
+ *Add for AT command to enable micbias.
+ */
+static int micbias_get(struct snd_kcontrol *kcontrol,
+        struct snd_ctl_elem_value *ucontrol)
+{
+	int val, reg1_val, reg2_val;
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+
+	reg1_val = (snd_soc_read(codec,
+			MSM89XX_PMIC_ANALOG_MICB_1_EN) &
+			0x80);
+
+	reg2_val = (snd_soc_read(codec,
+			MSM89XX_PMIC_ANALOG_MICB_2_EN) &
+			0x80);
+
+	if(reg1_val == 0x80) {
+		val = 1;
+	} else if(reg2_val == 0x80){
+		val = 2;
+	} else {
+		val = 0;
+	}
+
+	pr_info("%s val: %d\n", __func__, val);
+	return val;
+}
+
+static int micbias_put(struct snd_kcontrol *kcontrol,
+            struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+
+	dev_info(codec->dev, "%s enter \n", __func__);
+	dev_info(codec->dev, "%s  micbias_put %ld : \n",__func__, ucontrol->value.integer.value[0]);
+	switch (ucontrol->value.integer.value[0]) {
+	case 0:
+		msm_anlg_cdc_configure_cap(codec, false, false);
+		snd_soc_update_bits(codec, MSM89XX_PMIC_ANALOG_MICB_1_EN, 0x80, 0x00);
+		msm_anlg_cdc_configure_cap(codec, false, false);
+		snd_soc_update_bits(codec, MSM89XX_PMIC_ANALOG_MICB_2_EN, 0x80, 0x00);
+		break;
+	case 1:
+		msm_anlg_cdc_configure_cap(codec, true, false);
+		snd_soc_update_bits(codec, MSM89XX_PMIC_ANALOG_MICB_1_EN, 0x80, 0x80);
+		break;
+	case 2:
+		msm_anlg_cdc_configure_cap(codec, false, true);
+		snd_soc_update_bits(codec, MSM89XX_PMIC_ANALOG_MICB_2_EN, 0x80, 0x80);
+		break;
+	default:
+		dev_err(codec->dev, "%s invalid val \n", __func__);
+	}
+
+	return 0;
+}
+#endif /* VENDOR_EDIT */
+
+#ifdef VENDOR_EDIT
+/*Jianfeng.Qiu@PSW.MM.AudioDriver.Codec, 2018/07/31,
+ *Add for set different micbias voltage.
+ */
+static int micbias_voltage_get(struct snd_kcontrol *kcontrol,
+        struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+	struct sdm660_cdc_priv *sdm660_cdc = snd_soc_codec_get_drvdata(codec);
+	struct sdm660_cdc_pdata *pdata = sdm660_cdc->dev->platform_data;
+	int val = 0;
+
+	if (pdata) {
+		pr_info("%s cfilt1_mv %d\n", __func__, pdata->micbias.cfilt1_mv);
+		if (pdata->micbias.cfilt1_mv == 1800000) {
+			val = 0;
+		} else if (pdata->micbias.cfilt1_mv == 2700000) {
+			val = 1;
+		}
+	}
+
+	pr_info("%s val: %d\n", __func__, val);
+	return val;
+}
+
+static int micbias_voltage_put(struct snd_kcontrol *kcontrol,
+            struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(kcontrol);
+
+	pr_info("%s  value %ld \n",__func__, ucontrol->value.integer.value[0]);
+	switch (ucontrol->value.integer.value[0]) {
+	case 0:
+		msm_anlg_cdc_set_micb_v_switch(codec, 1800000);
+		break;
+	case 1:
+		msm_anlg_cdc_set_micb_v_switch(codec, 2700000);
+		break;
+	default:
+		pr_err("%s invalid val \n", __func__);
+	}
+
+	return 0;
+}
+#endif /* VENDOR_EDIT */
+
 static int msm_anlg_cdc_pa_gain_get(struct snd_kcontrol *kcontrol,
 				    struct snd_ctl_elem_value *ucontrol)
 {
@@ -1871,6 +2003,30 @@ static int msm_anlg_cdc_ext_spk_boost_set(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+
+#ifdef VENDOR_EDIT
+/*Jianfeng.Qiu@PSW.MM.AudioDriver.FTM.954616, 2016/08/24,
+ *Add for AT command to enable micbias.
+ */
+ /* xiang.fei@PSW.MM.AudioDriver.Codec, 2018/10/29, Modify for micbias */
+static char const *msm_anlg_cdc_micbias_ctrl_text[] = {
+		"DISABLE", "MICBIAS1", "MICBIAS2", "FORCE_MICBIAS1"};
+static const struct soc_enum msm_anlg_cdc_micbias_ctl_enum[] = {
+		SOC_ENUM_SINGLE_EXT(4, msm_anlg_cdc_micbias_ctrl_text),
+};
+#endif /* VENDOR_EDIT */
+
+#ifdef VENDOR_EDIT
+/*Jianfeng.Qiu@PSW.MM.AudioDriver.Codec, 2018/07/31,
+ *Add for set different micbias voltage.
+ */
+static char const *msm_anlg_cdc_micbias_v_switch_text[] = {
+		"V_1P80", "V_2P70"};
+static const struct soc_enum msm_anlg_cdc_micbias_v_switch_enum[] = {
+		SOC_ENUM_SINGLE_EXT(2, msm_anlg_cdc_micbias_v_switch_text),
+};
+#endif /* VENDOR_EDIT */
+
 static const char * const msm_anlg_cdc_ear_pa_boost_ctrl_text[] = {
 		"DISABLE", "ENABLE"};
 static const struct soc_enum msm_anlg_cdc_ear_pa_boost_ctl_enum[] = {
@@ -1915,6 +2071,13 @@ static const char * const cf_text[] = {
 
 
 static const struct snd_kcontrol_new msm_anlg_cdc_snd_controls[] = {
+	#ifdef VENDOR_EDIT
+	/*Jianfeng.Qiu@PSW.MM.AudioDriver.FTM.954616, 2016/08/24,
+	 *Add for AT command to enable micbias.
+	 */
+	SOC_ENUM_EXT("Enable Micbias", msm_anlg_cdc_micbias_ctl_enum[0],
+		micbias_get, micbias_put),
+	#endif /* VENDOR_EDIT */
 
 	SOC_ENUM_EXT("RX HPH Mode", msm_anlg_cdc_hph_mode_ctl_enum[0],
 		msm_anlg_cdc_hph_mode_get, msm_anlg_cdc_hph_mode_set),
@@ -1941,6 +2104,13 @@ static const struct snd_kcontrol_new msm_anlg_cdc_snd_controls[] = {
 	SOC_SINGLE_TLV("ADC3 Volume", MSM89XX_PMIC_ANALOG_TX_3_EN, 3,
 					8, 0, analog_gain),
 
+	#ifdef VENDOR_EDIT
+	/*Jianfeng.Qiu@PSW.MM.AudioDriver.Codec, 2018/07/31,
+	 *Add for set different micbias voltage.
+	 */
+	SOC_ENUM_EXT("MicBias_V_Switch", msm_anlg_cdc_micbias_v_switch_enum[0],
+		micbias_voltage_get, micbias_voltage_put),
+	#endif /* VENDOR_EDIT */
 
 };
 
@@ -2434,6 +2604,7 @@ static int msm_anlg_cdc_enable_ext_mb_source(struct wcd_mbhc *wcd_mbhc,
 
 	dev_dbg(codec->dev, "%s turn_on: %d count: %d\n", __func__, turn_on,
 			count);
+
 	if (turn_on) {
 		if (!count) {
 			ret = snd_soc_dapm_force_enable_pin(dapm,
@@ -3483,10 +3654,18 @@ static const struct snd_soc_dapm_widget msm_anlg_cdc_dapm_widgets[] = {
 		msm_anlg_cdc_codec_enable_adc, SND_SOC_DAPM_PRE_PMU |
 		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
+#ifndef VENDOR_EDIT
+/* xiang.fei@PSW.MM.AudioDriver.Codec, 2018/06/25, Modify for micbias */
 	SND_SOC_DAPM_MICBIAS_E("MIC BIAS External",
 		MSM89XX_PMIC_ANALOG_MICB_1_EN, 7, 0,
 		msm_anlg_cdc_codec_enable_micbias, SND_SOC_DAPM_PRE_PMU |
 		SND_SOC_DAPM_POST_PMD),
+#else
+		SND_SOC_DAPM_MICBIAS_E("MIC BIAS External",
+		MSM89XX_PMIC_ANALOG_MICB_1_EN, 7, 0,
+		msm_anlg_cdc_codec_enable_micbias, SND_SOC_DAPM_PRE_PMU |
+		SND_SOC_DAPM_POST_PMD),
+#endif
 	SND_SOC_DAPM_MICBIAS_E("MIC BIAS External2",
 		MSM89XX_PMIC_ANALOG_MICB_2_EN, 7, 0,
 		msm_anlg_cdc_codec_enable_micbias, SND_SOC_DAPM_POST_PMU |
@@ -3922,6 +4101,32 @@ static void msm_anlg_cdc_set_micb_v(struct snd_soc_codec *codec)
 	snd_soc_update_bits(codec, MSM89XX_PMIC_ANALOG_MICB_1_VAL,
 			0xF8, (reg_val << 3));
 }
+
+#ifdef VENDOR_EDIT
+/*Jianfeng.Qiu@PSW.MM.AudioDriver.Codec, 2018/07/31,
+ *Add for set different micbias voltage.
+ */
+void msm_anlg_cdc_set_micb_v_switch(struct snd_soc_codec *codec, u32 voltage)
+{
+
+	struct sdm660_cdc_priv *sdm660_cdc = snd_soc_codec_get_drvdata(codec);
+	struct sdm660_cdc_pdata *pdata = sdm660_cdc->dev->platform_data;
+	u8 reg_val;
+
+	if (!pdata) {
+		pr_warn("%s: no pdata, return\n", __func__);
+		return;
+	}
+
+	pdata->micbias.cfilt1_mv = voltage;
+	reg_val = VOLTAGE_CONVERTER(pdata->micbias.cfilt1_mv, MICBIAS_MIN_VAL,
+			MICBIAS_STEP_SIZE);
+	pr_info("%s: cfilt1_mv %d reg_val %x\n",
+			__func__, (u32)pdata->micbias.cfilt1_mv, reg_val);
+	snd_soc_update_bits(codec, MSM89XX_PMIC_ANALOG_MICB_1_VAL,
+			0xF8, (reg_val << 3));
+}
+#endif /* VENDOR_EDIT */
 
 static void msm_anlg_cdc_set_boost_v(struct snd_soc_codec *codec)
 {

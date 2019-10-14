@@ -442,7 +442,7 @@ static const struct snd_soc_dapm_widget msm_int_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Digital Mic2", msm_dmic_event),
 	SND_SOC_DAPM_MIC("Digital Mic3", msm_dmic_event),
 	SND_SOC_DAPM_MIC("Digital Mic4", msm_dmic_event),
-};
+	};
 
 static const struct snd_soc_dapm_widget msm_int_dig_dapm_widgets[] = {
 	SND_SOC_DAPM_SUPPLY_S("INT_MCLK0", -1, SND_SOC_NOPM, 0, 0,
@@ -1184,6 +1184,7 @@ static int msm_int_dig_mclk0_event(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+
 static int int_mi2s_get_port_id(int id)
 {
 	int afe_port_id;
@@ -1417,7 +1418,14 @@ static void *def_msm_int_wcd_mbhc_cal(void)
 		return NULL;
 
 #define S(X, Y) ((WCD_MBHC_CAL_PLUG_TYPE_PTR(msm_int_wcd_cal)->X) = (Y))
+	#ifndef VENDOR_EDIT
+	/*Jianfeng.Qiu@PSW.MM.AudioDriver.HeadsetDet, 2017/03/06,
+	 *Modify for headset detect.
+	 */
 	S(v_hs_max, 1500);
+	#else /* VENDOR_EDIT */
+	S(v_hs_max, 1700);
+	#endif
 #undef S
 #define S(X, Y) ((WCD_MBHC_CAL_BTN_DET_PTR(msm_int_wcd_cal)->X) = (Y))
 	S(num_btn, WCD_MBHC_DEF_BUTTONS);
@@ -1440,6 +1448,10 @@ static void *def_msm_int_wcd_mbhc_cal(void)
 	 * 210-290 == Button 2
 	 * 360-680 == Button 3
 	 */
+	#ifndef VENDOR_EDIT
+	/*Jianfeng.Qiu@PSW.MM.AudioDriver.HeadsetDet, 2017/03/03,
+	 *Modify for headset button threshold.
+	 */
 	btn_low[0] = 75;
 	btn_high[0] = 75;
 	btn_low[1] = 150;
@@ -1450,6 +1462,18 @@ static void *def_msm_int_wcd_mbhc_cal(void)
 	btn_high[3] = 450;
 	btn_low[4] = 500;
 	btn_high[4] = 500;
+	#else /* VENDOR_EDIT */
+	btn_low[0] = 60;		/* Hook ,0 ~ 160 Ohm*/
+	btn_high[0] = 130;
+	btn_low[1] = 131;
+	btn_high[1] = 131;
+	btn_low[2] = 253;		/* Volume + ,160 ~ 360 Ohm*/
+	btn_high[2] = 253;
+	btn_low[3] = 425;		/* Volume - ,360 ~ 680 Ohm*/
+	btn_high[3] = 425;
+	btn_low[4] = 426;
+	btn_high[4] = 426;
+	#endif /* VENDOR_EDIT */
 
 	return msm_int_wcd_cal;
 }
@@ -1992,6 +2016,10 @@ static struct snd_soc_dai_link msm_int_dai[] = {
 		.cpu_dai_name = "INT3_MI2S_TX_HOSTLESS",
 		.platform_name = "msm-pcm-hostless",
 		.dynamic = 1,
+		#ifdef VENDOR_EDIT
+		/*Jianfeng.Qiu@PSW.MM.AudioDriver.Machine, 2017/02/20, Add for loopback test*/
+		.dpcm_playback = 1,
+		#endif /* VENDOR_EDIT */
 		.dpcm_capture = 1,
 		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 			    SND_SOC_DPCM_TRIGGER_POST},
@@ -2914,6 +2942,27 @@ static struct snd_soc_dai_link msm_int_common_be_dai[] = {
 	},
 };
 
+#ifdef VENDOR_EDIT
+/* Jianfeng.Qiu@PSW.MM.AudioDriver.SmartPA, 2017/09/21, Add for tfa98xx */
+static struct snd_soc_dai_link tfa98xx_be_dai_links[] = {
+	{
+		.name = LPASS_BE_TERT_MI2S_RX,
+		.stream_name = "Tertiary MI2S Playback",
+		.cpu_dai_name = "msm-dai-q6-mi2s.2",
+		.platform_name = "msm-pcm-routing",
+		.codec_name = "tfa98xx.2-0035",
+		.codec_dai_name = "tfa98xx-aif-2-35",
+		.no_pcm = 1,
+		.dpcm_playback = 1,
+		.id = MSM_BACKEND_DAI_TERTIARY_MI2S_RX,
+		.be_hw_params_fixup = msm_common_be_hw_params_fixup,
+		.ops = &msm_mi2s_be_ops,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+	},
+};
+#endif /* VENDOR_EDIT */
+
 static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 	{
 		.name = LPASS_BE_PRI_MI2S_RX,
@@ -3384,6 +3433,17 @@ static struct snd_soc_card *msm_int_populate_sndcard_dailinks(
 	struct snd_soc_dai_link *dailink;
 	int len1;
 
+
+	#ifdef VENDOR_EDIT
+	/* Jianfeng.Qiu@PSW.MM.AudioDriver.Machine, 2017/01/23,
+	 * Add for custom audio.
+	 */
+	int i;
+	const char *product_name = NULL;
+	const char *oppo_speaker_type = "oppo,speaker-pa";
+	struct snd_soc_dai_link *temp_link;
+	#endif /* VENDOR_EDIT */
+
 	if (snd_card_val == INT_SND_CARD)
 		card = &sdm660_card;
 	else
@@ -3419,6 +3479,28 @@ static struct snd_soc_card *msm_int_populate_sndcard_dailinks(
 
 	if (of_property_read_bool(dev->of_node,
 				  "qcom,mi2s-audio-intf")) {
+		#ifdef VENDOR_EDIT
+		/* Jianfeng.Qiu@PSW.MM.AudioDriver.Machine, 2017/01/23,
+		 * Add for custom audio.
+		 */
+		if (!of_property_read_string(dev->of_node, oppo_speaker_type,
+				&product_name)) {
+			pr_info("%s: custom speaker product %s\n", __func__, product_name);
+			for (i = 0; i < ARRAY_SIZE(msm_mi2s_be_dai_links); i++) {
+				temp_link = &msm_mi2s_be_dai_links[i];
+				if (temp_link->id == MSM_BACKEND_DAI_TERTIARY_MI2S_RX) {
+					if (!strcmp(product_name, "nxp")
+						&& soc_find_component(NULL, tfa98xx_be_dai_links[0].codec_name)) {
+						pr_info("%s: use nxp dailink replace\n", __func__);
+						memcpy(temp_link, &tfa98xx_be_dai_links[0],
+							sizeof(tfa98xx_be_dai_links[0]));
+						break;
+					}
+				}
+			}
+		}
+		#endif /* VENDOR_EDIT */
+
 		memcpy(dailink + len1,
 		       msm_mi2s_be_dai_links,
 		       sizeof(msm_mi2s_be_dai_links));
