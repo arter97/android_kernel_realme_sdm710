@@ -30,15 +30,148 @@
 				   "usbin_i",
 				   "usbin_v";
 
-		qcom,wipower-max-uw = <5000000>;
+//#ifdef VENDOR_EDIT /* Jianchao.Shi@BSP.CHG.Basic, 2017/01/20, sjc Delete for charging */
+		//qcom,wipower-max-uw = <5000000>;
+//#endif
 
 		dpdm-supply = <&qusb_phy0>;
 
 		qcom,thermal-mitigation
 				= <3000000 2500000 2000000 1500000
 					1000000 500000>;
-		qcom,auto-recharge-soc;
+//#ifdef VENDOR_EDIT /* Jianchao.Shi@BSP.CHG.Basic, 2017/01/20, sjc Delete for charging */
+		//qcom,auto-recharge-soc;
+//#endif
+//#ifdef VENDOR_EDIT /* Jianchao.Shi@BSP.CHG.Basic, 2016/12/26, sjc Add for charging */
+			//for smb2:
+			qcom,usb-icl-ua = <2000000>;
+			qcom,fcc-max-ua = <2000000>;
+			//qcom,fv-max-uv = <4373000>;
+			qcom,hvdcp-disable;
+			qcom,pm660chg-vadc = <&pm660_vadc>;//chargID
+			qcom,pm660usbtemp-vadc = <&pm660_vadc>;//usb temp
+			//qcom,otg-cl-ua = <2000000>;
+			qcom,float-option = <1>;
 
+			//for oppo chg framework:
+			qcom,input_current_charger_ma = <2000>;
+			qcom,input_current_usb_ma = <500>;
+
+			qcom,input_current_led_ma = <1200>;
+
+			qcom,input_current_camera_ma = <1200>;
+			//qcom,input_current_led_ma_overtemp = <900>;
+			qcom,overtemp_bat_decidegc = <350>;
+			qcom,iterm_disabled = <0>;
+			qcom,iterm_ma = <200>;
+			qcom,recharge-mv = <100>;
+			qcom,batt_capacity_mah = <3765>;
+
+			qcom,removed_bat_decidegc = <190>;  /*<-19C*/
+
+			qcom,cold_bat_decidegc = <20>;  /*-3C~0C*/
+			qcom,temp_cold_vfloat_mv = <3980>;
+			qcom,temp_cold_fastchg_current_ma = <330>;
+
+			qcom,little_cold_bat_decidegc = <0>;	/*0C~5C*/
+			qcom,temp_little_cold_vfloat_mv = <4387>;
+            qcom,temp_little_cold_fastchg_current_ma_high = <1788>;
+			qcom,temp_little_cold_fastchg_current_ma_low = <1073>;
+
+			qcom,cool_bat_decidegc = <50>;	/*5C~12C*/
+			qcom,temp_cool_vfloat_mv = <4387>;
+			qcom,temp_cool_fastchg_current_ma_high = <2100>;
+			qcom,temp_cool_fastchg_current_ma_low = <1788>;
+
+			qcom,little_cool_bat_decidegc = <120>;	/*12C~16C*/
+			qcom,temp_little_cool_vfloat_mv = <4387>;
+			qcom,temp_little_cool_fastchg_current_ma = <2100>;
+
+			qcom,normal_bat_decidegc = <160>;	/*16C~45C*/
+			qcom,temp_normal_fastchg_current_ma = <2100>;
+			qcom,temp_normal_vfloat_mv = <4387>;
+
+			qcom,warm_bat_decidegc = <450>;		/*48C~53C*/ /*8pin Bat Vooc project need add 3 degree C*/
+			qcom,temp_warm_vfloat_mv = <4130>;
+			qcom,temp_warm_fastchg_current_ma = <1016>;
+
+			qcom,hot_bat_decidegc = <530>;
+
+			qcom,non_standard_vfloat_mv = <3980>;
+			qcom,non_standard_fastchg_current_ma = <512>;
+
+
+
+			qcom,cold_vfloat_sw_limit = <3930>;
+			qcom,little_cold_vfloat_sw_limit = <4350>;
+			qcom,cool_vfloat_sw_limit = <4350>;
+			qcom,little_cool_vfloat_sw_limit = <4350>;
+			qcom,normal_vfloat_sw_limit = <4350>;
+			qcom,warm_vfloat_sw_limit = <4080>;
+			qcom,non_standard_vfloat_sw_limit = <3930>;
+
+
+			qcom,max_chg_time_sec = <36000>;
+			qcom,charger_hv_thr = <5800>;
+			qcom,charger_lv_thr = <3400>;
+			qcom,vbatt_full_thr = <4400>;
+			qcom,vbatt_hv_thr = <4500>;
+			qcom,vfloat_step_mv = <8>;
+			qcom,non_standard_vfloat_over_sw_limit = <3980>;
+			qcom,cold_vfloat_over_sw_limit = <3980>;
+			qcom,little_cold_vfloat_over_sw_limit = <4387>;
+			qcom,cool_vfloat_over_sw_limit = <4387>;
+			qcom,little_cool_vfloat_over_sw_limit = <4387>;
+			qcom,normal_vfloat_over_sw_limit = <4387>;
+			qcom,warm_vfloat_over_sw_limit = <4130>;
+
+			qcom,vbatt_power_off = <3300>;
+			qcom,vbatt_soc_1 = <3410>;
+			qcom,vooc_project = <1>;
+			qcom,vbatt_num = <1>;
+
+
+			qcom,normal_vterm_hw_inc = <150>;
+			qcom,non_normal_vterm_hw_inc = <18>;
+
+
+			qcom,default_iterm_ma = <200>;
+			qcom,default_temp_normal_fastchg_current_ma = <2000>;
+			qcom,default_normal_vfloat_sw_limit = <4350>;
+			qcom,default_temp_normal_vfloat_mv = <4387>;
+			qcom,default_normal_vfloat_over_sw_limit = <4397>;
+
+			qcom,default_temp_little_cool_fastchg_current_ma = <2100>;
+			qcom,default_little_cool_vfloat_sw_limit = <4350>;
+			qcom,default_temp_little_cool_vfloat_mv = <4387>;
+			qcom,default_little_cool_vfloat_over_sw_limit = <4397>;
+			///qcom,offset_temp = <30>;
+			//for control:
+			//qcom,suspend_after_full;
+			qcom,check_batt_full_by_sw;
+			qcom,external_gauge;
+			qcom,chg_ctrl_by_lcd;
+			qcom,chg_ctrl_by_camera;
+			qcom,sw_vfloat_over_protect_enable;
+			qcom,charger_id_num = <7>;
+
+			qcom,chargerid_switch-gpio = <&tlmm 93 0x00>;
+			qcom,ship-gpio = <&tlmm 67 0x00>;
+
+			//qcom,dischg-gpio = <&pm660l_gpios 7 0x00>;
+			pinctrl-names = "chargerid_switch_active", "chargerid_switch_sleep", "chargerid_switch_default",
+							"ship_active", "ship_sleep",
+							"chg_qupv3_se12_2uart_sleep", "chg_qupv3_se12_2uart_default";
+							/*"dischg_enable", "dischg_disable",*/
+			pinctrl-0 = <&chargerid_switch_active>;
+			pinctrl-1 = <&chargerid_switch_sleep>;
+			pinctrl-2 = <&chargerid_switch_default>;
+			pinctrl-3 = <&ship_active>;
+			pinctrl-4 = <&ship_sleep>;
+			pinctrl-5 = <&chg_qupv3_se12_2uart_sleep>;
+			pinctrl-6 = <&chg_qupv3_se12_2uart_default>;
+
+//#endif //VENDOR_EDIT
 		qcom,chgr@1000 {
 			reg = <0x1000 0x100>;
 			interrupts =
@@ -184,7 +317,11 @@
 		qcom,hold-soc-while-full;
 		qcom,fg-auto-recharge-soc;
 		qcom,fg-recharge-soc-thr = <98>;
-		status = "okay";
+//#ifndef VENDOR_EDIT /* Jianchao.Shi@BSP.CHG.Basic, 2018/02/05, sjc Modify for charging */
+		//status = "okay";
+//#else
+		status = "disabled";
+//#endif
 
 		qcom,fg-batt-soc@4000 {
 			status = "okay";
@@ -248,7 +385,10 @@
 		qcom,pmic-revid = <&pm660_revid>;
 		qcom,pmic-misc = <&pm660_misc>;
 		qcom,misc-clk-trim-error-reg = <0xf3>;
-		qcom,actuator-type = <0>;
+		//#ifdef VENDOR_EDIT
+		//Added by wanghao@Bsp.group.Tp for vib min time setting,2018/5/17
+		qcom,actuator-type = <1>;
+		//#endif
 		qcom,play-mode = "direct";
 		qcom,vmax-mv = <3200>;
 		qcom,ilim-ma = <800>;
@@ -258,6 +398,10 @@
 		qcom,lra-high-z = "opt0";
 		qcom,lra-auto-res-mode = "qwd";
 		qcom,lra-res-cal-period = <4>;
+		//#ifdef VENDOR_EDIT
+		//Added by wanghao@Bsp.group.Tp for vib min time setting,2018/5/17
+		qcom,vib-timemin-ms = <35>;
+		//#endif
 	};
 };
 
@@ -386,7 +530,22 @@
 					<&pm660_charger>, <&pm660_charger>;
 	vbus_dwc3-supply = <&smb2_vbus>;
 	qcom,no-vbus-vote-with-type-C;
+//#ifdef VENDOR_EDIT /* Jianchao.Shi@BSP.CHG.Basic, 2018/02/08, sjc Add for USB */
+	dwc3@a600000 {
+		usb-phy = <&qusb_phy0>, <&usb_nop_phy>;
+		maximum-speed = "high-speed";
+	};
+//#endif //VENDOR_EDIT
 };
+
+//#ifdef VENDOR_EDIT /* Jianchao.Shi@BSP.CHG.Basic, 2018/02/08, sjc Add for USB */
+&usb_qmp_dp_phy {
+	status = "disabled";
+};
+&qupv3_se3_i2c {
+	status = "disabled";
+};
+//#endif //VENDOR_EDIT
 
 &thermal_zones {
 	xo-therm-step {

@@ -346,9 +346,11 @@
 			regulator-min-microvolt = <1800000>;
 			regulator-max-microvolt = <1800000>;
 			qcom,proxy-consumer-enable;
-			qcom,proxy-consumer-current = <115000>;
+			/*ifdef VENDOR_EDIT wanghaoran added for subcamera power supply at 20190110 */
+			qcom,proxy-consumer-current = <150000>;
 			qcom,init-voltage = <1800000>;
-			qcom,init-mode = <RPMH_REGULATOR_MODE_LPM>;
+			qcom,init-mode = <RPMH_REGULATOR_MODE_HPM>;
+			/*endif */
 		};
 	};
 

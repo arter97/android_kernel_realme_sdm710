@@ -45,6 +45,7 @@
 			qcom,kpdpwr-sw-debounce;
 			qcom,system-reset;
 			qcom,store-hard-reset-reason;
+			oppo,pmicwd;
 
 			qcom,pon_1 {
 				qcom,pon-type = <0>;
@@ -242,6 +243,33 @@
 				qcom,fast-avg-setup = <0>;
 				qcom,cal-val = <0>;
 			};
+            //#ifdef VENDOR_EDIT /* Jianchao.Shi@BSP.CHG.Basic, 2017/01/23, sjc Add for charging */
+			chan@19 {
+				label = "gpio12_adc";
+				reg = <0x19>; //channel for GPIO7
+				qcom,decimation = <2>;
+				qcom,pre-div-channel-scaling = <0>; //1:1 scaling
+				qcom,calibration-type = "absolute";
+				qcom,scale-function = <0>;
+				qcom,hw-settle-time = <2>;
+				qcom,fast-avg-setup = <0>;
+                qcom,cal-val = <0>;
+			};
+			//#endif
+			//#ifdef VENDOR_EDIT /* Wanghao@BSP.CHG.Basic, 2017/01/23, sjc Add for sub board choose */
+			chan@13 {
+				label = "gpio3_adc";
+				reg = <0x13>; //channel for GPIO3
+				qcom,decimation = <2>;
+				qcom,pre-div-channel-scaling = <0>; //1:1 scaling
+				qcom,calibration-type = "absolute";
+				qcom,scale-function = <0>;
+				qcom,hw-settle-time = <2>;
+				qcom,fast-avg-setup = <0>;
+                qcom,cal-val = <0>;
+			};
+			//#endif
+
 		};
 
 		pm660_pdphy: qcom,usb-pdphy@1700 {
