@@ -49,22 +49,22 @@
 #define PAGESIZE 512
 #define MAX_GESTURE_COORD 6
 
-#define UnkownGesture       0
-#define DouTap              1	// double tap
-#define UpVee               2	// V
-#define DownVee             3	// ^
-#define LeftVee             4	// >
-#define RightVee            5	// <
-#define Circle              6	// O
-#define DouSwip             7	// ||
-#define Left2RightSwip      8	// -->
-#define Right2LeftSwip      9	// <--
-#define Up2DownSwip         10	// |v
-#define Down2UpSwip         11	// |^
-#define Mgestrue            12	// M
-#define Wgestrue            13	// W
-#define FingerprintDown     14
-#define FingerprintUp       15
+#define KEY_GESTURE_UNKNOWN	0
+#define KEY_GESTURE_FP_DOWN	1
+#define KEY_GESTURE_FP_UP	2
+#define KEY_GESTURE_DOUBLE_TAP	KEY_F1 // double tap
+#define KEY_GESTURE_V		KEY_F2 // V
+#define KEY_GESTURE_INVERT_V	KEY_F3 // ^
+#define KEY_GESTURE_LEFT_V	KEY_F4 // >
+#define KEY_GESTURE_RIGHT_V	KEY_F5 // <
+#define KEY_GESTURE_CIRCLE	KEY_F6 // O
+#define KEY_GESTURE_DOUBLE_SWIPE	KEY_F7 // ||
+#define KEY_GESTURE_SWIPE_RIGHT	KEY_F8 // -->
+#define KEY_GESTURE_SWIPE_LEFT	KEY_F9 // <--
+#define KEY_GESTURE_SWIPE_DOWN	KEY_F10 // |v
+#define KEY_GESTURE_SWIPE_UP	KEY_F11 // |^
+#define KEY_GESTURE_M		KEY_F12 // M
+#define KEY_GESTURE_W		KEY_F13 // W
 
 #define FINGERPRINT_DOWN_DETECT 0X0f
 #define FINGERPRINT_UP_DETECT 0X1f
