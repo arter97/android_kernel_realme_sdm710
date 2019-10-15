@@ -52,7 +52,7 @@
 #define KEY_GESTURE_UNKNOWN	0
 #define KEY_GESTURE_FP_DOWN	1
 #define KEY_GESTURE_FP_UP	2
-#define KEY_GESTURE_DOUBLE_TAP	KEY_F1 // double tap
+#define KEY_GESTURE_DOUBLE_TAP	KEY_WAKEUP // double tap
 #define KEY_GESTURE_V		KEY_F2 // V
 #define KEY_GESTURE_INVERT_V	KEY_F3 // ^
 #define KEY_GESTURE_LEFT_V	KEY_F4 // >
