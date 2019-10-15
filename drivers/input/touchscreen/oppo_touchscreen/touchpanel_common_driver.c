@@ -657,7 +657,7 @@ static void tp_touch_handle(struct touchpanel_data *ts)
     int i = 0;
     uint8_t finger_num = 0, touch_near_edge = 0, finger_num_center = 0;
     int obj_attention = 0;
-    struct point_info points[ts->max_num];
+    struct point_info points[10];
     struct corner_info corner[4];
     static bool up_status = false;
     static struct point_info last_point = {.x = 0, .y = 0};

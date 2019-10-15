@@ -278,12 +278,11 @@ int touch_i2c_continue_write(struct i2c_client* client, unsigned short length, u
  * Actully, This function call i2c_transfer for IIC transfer,
  * Returning transfer length(transfer success) or most likely negative errno(transfer error)
  */
-#ifndef CONFIG_HAVE_ARCH_VMAP_STACK
 int touch_i2c_write_block(struct i2c_client* client, u16 addr, unsigned short length, unsigned char const *data)
 {
     int retval;
     unsigned char retry;
-    unsigned char buffer[length + 2];
+    unsigned char buffer[1024 + 2];
     struct i2c_msg msg[1];
 
     msg[0].addr = client->addr;
@@ -319,102 +318,6 @@ int touch_i2c_write_block(struct i2c_client* client, u16 addr, unsigned short le
     }
     return retval;
 }
-#else
-int touch_i2c_write_block(struct i2c_client* client, u16 addr, unsigned short length, unsigned char const *data)
-{
-    int retval;
-    unsigned char retry;
-    unsigned int total_length = 0;
-    static unsigned int write_buf_size = 0;
-    static unsigned char *write_buf = NULL;
-    struct i2c_msg msg[1];
-
-    mutex_lock(&i2c_mutex);
-
-    total_length = length + (register_is_16bit ? 2 : 1);
-    if (total_length > FIX_I2C_LENGTH) {
-        if (write_buf_size < total_length) {
-            if (write_buf) {
-                kfree(write_buf);
-                TPD_INFO("write block_1, free once.\n");
-            }
-            write_buf = kzalloc(total_length, GFP_KERNEL | GFP_DMA);
-            if (!write_buf) {
-                write_buf_size = 0;
-                TPD_INFO("write block_1, kzalloc failed(len:%d, buf_size:%d).\n", total_length, write_buf_size);
-                mutex_unlock(&i2c_mutex);
-                return -ENOMEM;
-            }
-            write_buf_size = total_length;
-            TPD_INFO("write block_1, kzalloc success(len:%d, buf_size:%d).\n", total_length, write_buf_size);
-        } else {
-            memset(write_buf, 0, total_length);
-        }
-    } else {
-        if (write_buf_size > FIX_I2C_LENGTH) {
-            kfree(write_buf);
-            write_buf = kzalloc(FIX_I2C_LENGTH, GFP_KERNEL | GFP_DMA);
-            if (!write_buf) {
-                write_buf_size = 0;
-                TPD_INFO("write block_2, kzalloc failed(len:%d, buf_size:%d).\n", total_length, write_buf_size);
-                mutex_unlock(&i2c_mutex);
-                return -ENOMEM;
-            }
-            write_buf_size = FIX_I2C_LENGTH;
-            TPD_INFO("write block_2, kzalloc success(len:%d, buf_size:%d).\n", total_length, write_buf_size);
-        } else {
-            if (!write_buf) {
-                write_buf = kzalloc(FIX_I2C_LENGTH, GFP_KERNEL | GFP_DMA);
-                if (!write_buf) {
-                    write_buf_size = 0;
-                    TPD_INFO("write block_3, kzalloc failed(len:%d, buf_size:%d).\n", total_length, write_buf_size);
-                    mutex_unlock(&i2c_mutex);
-                    return -ENOMEM;
-                }
-                write_buf_size = FIX_I2C_LENGTH;
-                TPD_INFO("write block_3, kzalloc success(len:%d, buf_size:%d).\n", total_length, write_buf_size);
-            } else {
-                memset(write_buf, 0, total_length);
-            }
-        }
-    }
-
-    msg[0].addr = client->addr;
-    msg[0].flags = 0;
-    msg[0].buf = write_buf;
-
-    if (!register_is_16bit)  // if register is 8bit
-    {
-        msg[0].len = length + 1;
-        msg[0].buf[0] = addr & 0xff;
-
-        memcpy(&write_buf[1], &data[0], length);
-    }
-    else
-    {
-        msg[0].len = length + 2;
-        msg[0].buf[0] = (addr >> 8) & 0xff;
-        msg[0].buf[1] = addr & 0xff;
-
-        memcpy(&write_buf[2], &data[0], length);
-    }
-
-    for (retry = 0; retry < MAX_I2C_RETRY_TIME; retry++) {
-        if (i2c_transfer(client->adapter, msg, 1) == 1) {
-            retval = length;
-            break;
-        }
-        msleep(20);
-    }
-    if (retry == MAX_I2C_RETRY_TIME) {
-        TPD_INFO("%s: I2C write over retry limit\n", __func__);
-        retval = -EIO;
-    }
-
-    mutex_unlock(&i2c_mutex);
-    return retval;
-}
-#endif
 
 /**
  * touch_i2c_read_byte - Using for "read word" through IIC

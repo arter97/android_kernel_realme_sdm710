@@ -76,7 +76,7 @@ static int synaptics_get_touch_points(void *chip_data, struct point_info *points
         static int enable_obj_attention = 0;
         unsigned char fingers_to_process = max_num;
         struct chip_data_s3706 *chip_info = (struct chip_data_s3706 *)chip_data;
-        char buf[8*max_num];
+        char buf[8*10];
 
         memset(buf, 0, sizeof(buf));
         obj_attention = touch_i2c_read_word(chip_info->client, chip_info->reg_info.F12_2D_DATA15);
