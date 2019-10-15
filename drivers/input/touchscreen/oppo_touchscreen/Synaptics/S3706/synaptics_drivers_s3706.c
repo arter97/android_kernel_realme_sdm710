@@ -1137,42 +1137,42 @@ static int synaptics_get_gesture_info(void *chip_data,
 	/*detect the gesture mode */
 	switch (gesture_sign) {
 	case DTAP_DETECT:
-		gesture->gesture_type = DouTap;
+		gesture->gesture_type = KEY_GESTURE_DOUBLE_TAP;
 		break;
 	case SWIPE_DETECT:
-		gesture->gesture_type = (regswipe == 0x41) ? Left2RightSwip :
-		    (regswipe == 0x42) ? Right2LeftSwip :
-		    (regswipe == 0x44) ? Up2DownSwip :
-		    (regswipe == 0x48) ? Down2UpSwip :
-		    (regswipe == 0x80) ? DouSwip : UnkownGesture;
+		gesture->gesture_type = (regswipe == 0x41) ? KEY_GESTURE_SWIPE_RIGHT :
+		    (regswipe == 0x42) ? KEY_GESTURE_SWIPE_LEFT :
+		    (regswipe == 0x44) ? KEY_GESTURE_SWIPE_DOWN :
+		    (regswipe == 0x48) ? KEY_GESTURE_SWIPE_UP :
+		    (regswipe == 0x80) ? KEY_GESTURE_DOUBLE_SWIPE : KEY_GESTURE_UNKNOWN;
 		break;
 	case CIRCLE_DETECT:
-		gesture->gesture_type = Circle;
+		gesture->gesture_type = KEY_GESTURE_CIRCLE;
 		break;
 	case VEE_DETECT:
-		gesture->gesture_type = (gesture_buffer[2] == 0x01) ? DownVee :
-		    (gesture_buffer[2] == 0x02) ? UpVee :
-		    (gesture_buffer[2] == 0x04) ? RightVee :
-		    (gesture_buffer[2] == 0x08) ? LeftVee : UnkownGesture;
+		gesture->gesture_type = (gesture_buffer[2] == 0x01) ? KEY_GESTURE_INVERT_V :
+		    (gesture_buffer[2] == 0x02) ? KEY_GESTURE_V :
+		    (gesture_buffer[2] == 0x04) ? KEY_GESTURE_RIGHT_V :
+		    (gesture_buffer[2] == 0x08) ? KEY_GESTURE_LEFT_V : KEY_GESTURE_UNKNOWN;
 		break;
 	case UNICODE_DETECT:
 		gesture->gesture_type = (gesture_buffer[2] == 0x77
 					 && gesture_buffer[3] ==
-					 0x00) ? Wgestrue : (gesture_buffer[2]
+					 0x00) ? KEY_GESTURE_W : (gesture_buffer[2]
 							     == 0x6d
 							     &&
 							     gesture_buffer[3]
 							     ==
-							     0x00) ? Mgestrue :
-		    UnkownGesture;
+							     0x00) ? KEY_GESTURE_M :
+		    KEY_GESTURE_UNKNOWN;
 		break;
 	case FINGERPRINT_DOWN_DETECT:
 		chip_info->is_fp_down = true;
-		gesture->gesture_type = FingerprintDown;
+		gesture->gesture_type = KEY_GESTURE_FP_DOWN;
 		break;
 	case FINGERPRINT_UP_DETECT:
 		chip_info->is_fp_down = false;
-		gesture->gesture_type = FingerprintUp;
+		gesture->gesture_type = KEY_GESTURE_FP_UP;
 		if (chip_info->force_update_needed) {
 			chip_info->force_update_needed = false;
 			touch_i2c_write_byte(chip_info->client, 0xff, 0x01);	/* page 1 */
@@ -1183,10 +1183,10 @@ static int synaptics_get_gesture_info(void *chip_data,
 		}
 		break;
 	default:
-		gesture->gesture_type = UnkownGesture;
+		gesture->gesture_type = KEY_GESTURE_UNKNOWN;
 	}
 
-	if (gesture->gesture_type != UnkownGesture) {
+	if (gesture->gesture_type != KEY_GESTURE_UNKNOWN) {
 		for (i = 0; i < 23; i += 2) {
 			trspoint =
 			    coordinate_buf[i] | coordinate_buf[i + 1] << 8;
@@ -2933,7 +2933,7 @@ static void synaptics_get_gesture_coord(void *chip_data, uint32_t gesture_type)
 	sys_write(fd, str_gesture, strlen(str_gesture));
 	sys_write(fd, "\n", 1);
 	TPD_INFO("str_gesture:%s\n", str_gesture);
-	if (gesture_type == DouSwip) {
+	if (gesture_type == KEY_GESTURE_DOUBLE_SWIPE) {
 		TPD_INFO("str_gessec\n");
 		memset(str_gesture, 0, GESTURE_COORD_LEN);
 		memset(raw_data, 0,
@@ -5915,10 +5915,10 @@ static void synaptics_gesture_rate(struct seq_file *s, u16 * coord_arg,
 	ret = touch_i2c_read_byte(chip_info->client, chip_info->reg_info.F01_RMI_CTRL00);	/* page 4 */
 	ret = touch_i2c_write_byte(chip_info->client, chip_info->reg_info.F01_RMI_CTRL00, ret | 0x08);	/* page 4 */
 	ret = touch_i2c_write_byte(chip_info->client, 0xff, 0x04);	/* page 4 */
-	if (coord_arg[0] == DouTap) {
+	if (coord_arg[0] == KEY_GESTURE_DOUBLE_TAP) {
 		ret = touch_i2c_write_word(chip_info->client, 0x25, coord_arg[1]);	/*write length */
 		ret = touch_i2c_write_byte(chip_info->client, 0x28, 2);	/*Data Function */
-	} else if (coord_arg[0] == DouSwip) {
+	} else if (coord_arg[0] == KEY_GESTURE_DOUBLE_SWIPE) {
 		ret = touch_i2c_write_word(chip_info->client, 0x25, coord_arg[1] + coord_arg[105]);	/*write length */
 		ret = touch_i2c_write_byte(chip_info->client, 0x28, 4);	/*Data Function */
 	} else {
@@ -5929,7 +5929,7 @@ static void synaptics_gesture_rate(struct seq_file *s, u16 * coord_arg,
 	for (loop = 0; loop < 2 * coord_arg[1]; loop++) {
 		ret = touch_i2c_write_byte(chip_info->client, 0x27, *(coord + loop + 6));	/*write coordinate */
 	}
-	if (coord_arg[0] == DouSwip) {
+	if (coord_arg[0] == KEY_GESTURE_DOUBLE_SWIPE) {
 		for (loop = 0; loop < 2 * coord_arg[105]; loop++) {
 			ret = touch_i2c_write_byte(chip_info->client, 0x27, *(coord + loop + 4 + 210));	/*write coordinate */
 		}
