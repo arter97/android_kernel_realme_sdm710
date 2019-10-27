@@ -2795,6 +2795,7 @@ static void hdd_update_ipa_component_config(struct hdd_context *hdd_ctx)
 	ipa_cfg.ipa_bw_high = cfg->IpaHighBandwidthMbps;
 	ipa_cfg.ipa_bw_medium = cfg->IpaMediumBandwidthMbps;
 	ipa_cfg.ipa_bw_low = cfg->IpaLowBandwidthMbps;
+	ipa_cfg.ipa_force_voting = cfg->IpaForceVoting;
 
 	ucfg_ipa_update_config(&ipa_cfg);
 }
@@ -4433,7 +4434,8 @@ int hdd_vdev_create(struct hdd_adapter *adapter,
 	status = qdf_event_reset(&adapter->qdf_session_open_event);
 	if (QDF_STATUS_SUCCESS != status) {
 		hdd_err("failed to reinit session open event");
-		return -EINVAL;
+		errno = qdf_status_to_os_return(status);
+		goto objmgr_vdev_destroy_procedure;
 	}
 	errno = hdd_set_sme_session_param(adapter, &sme_session_params,
 					  callback, ctx);
@@ -4453,17 +4455,14 @@ int hdd_vdev_create(struct hdd_adapter *adapter,
 	status = qdf_wait_for_event_completion(&adapter->qdf_session_open_event,
 			SME_CMD_VDEV_CREATE_DELETE_TIMEOUT);
 	if (QDF_STATUS_SUCCESS != status) {
-		if (adapter->qdf_session_open_event.force_set) {
+		if (adapter->qdf_session_open_event.force_set)
 			/*
 			 * SSR/PDR has caused shutdown, which has forcefully
-			 * set the event. Return without the closing session.
+			 * set the event.
 			 */
-			adapter->session_id = HDD_SESSION_ID_INVALID;
 			hdd_err("Session open event forcefully set");
-			return -EINVAL;
-		}
 
-		if (QDF_STATUS_E_TIMEOUT == status)
+		else if (QDF_STATUS_E_TIMEOUT == status)
 			hdd_err("Session failed to open within timeout period");
 		else
 			hdd_err("Failed to wait for session open event(status-%d)",
@@ -6039,7 +6038,6 @@ static void hdd_reset_scan_operation(struct hdd_context *hdd_ctx,
 		break;
 	case QDF_SAP_MODE:
 		qdf_atomic_set(&adapter->session.ap.acs_in_progress, 0);
-		wlan_hdd_undo_acs(adapter);
 		break;
 	default:
 		break;
