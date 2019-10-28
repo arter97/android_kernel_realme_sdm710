@@ -55,7 +55,7 @@ Module.symvers
 /Module.markers
 /*.img
 /*.zip
-/kernelzip
+!/kernelzip/**
 
 # ramfs
 !/ramdisk/**

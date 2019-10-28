@@ -34,28 +34,33 @@ else
 	fi
 fi
 
-echo "Building new ramdisk"
-#remove previous ramfs files
-rm -rf '$RAMFS_TMP'*
-rm -rf $RAMFS_TMP
-rm -rf $RAMFS_TMP.cpio
-#copy ramfs files to tmp directory
-cp -axpP $RAMFS_SOURCE $RAMFS_TMP
-cd $RAMFS_TMP
+if [[ "$stock" == "1" ]] ; then
+	echo "Skipping ramdisk"
+	touch $RAMFS_TMP.cpio.gz
+else
+	echo "Building new ramdisk"
+	#remove previous ramfs files
+	rm -rf '$RAMFS_TMP'*
+	rm -rf $RAMFS_TMP
+	rm -rf $RAMFS_TMP.cpio
+	#copy ramfs files to tmp directory
+	cp -axpP $RAMFS_SOURCE $RAMFS_TMP
+	cd $RAMFS_TMP
 
-#clear git repositories in ramfs
-find . -name .git -exec rm -rf {} \;
-find . -name EMPTY_DIRECTORY -exec rm -rf {} \;
+	#clear git repositories in ramfs
+	find . -name .git -exec rm -rf {} \;
+	find . -name EMPTY_DIRECTORY -exec rm -rf {} \;
 
-$KERNELDIR/ramdisk_fix_permissions.sh 2>/dev/null
+	$KERNELDIR/ramdisk_fix_permissions.sh 2>/dev/null
 
-cd $KERNELDIR
-rm -rf $RAMFS_TMP/tmp/*
+	cd $KERNELDIR
+	rm -rf $RAMFS_TMP/tmp/*
 
-cd $RAMFS_TMP
-find . | fakeroot cpio -H newc -o | gzip -9 > $RAMFS_TMP.cpio.gz
-ls -lh $RAMFS_TMP.cpio.gz
-cd $KERNELDIR
+	cd $RAMFS_TMP
+	find . | fakeroot cpio -H newc -o | gzip -9 > $RAMFS_TMP.cpio.gz
+	ls -lh $RAMFS_TMP.cpio.gz
+	cd $KERNELDIR
+fi
 
 echo "Making new boot image"
 mkbootimg \
