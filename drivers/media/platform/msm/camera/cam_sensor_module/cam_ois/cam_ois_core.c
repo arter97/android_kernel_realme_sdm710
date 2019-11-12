@@ -35,18 +35,18 @@ void RamWrite32A( UINT_16 addr, UINT_32 data)
 {
     int32_t rc = 0;
     struct cam_sensor_i2c_reg_array i2c_write_setting = {
-	.reg_addr = addr,
-	.reg_data = data,
-	.delay = 0x00,
-	.data_mask = 0x00,
+    	.reg_addr = addr,
+    	.reg_data = data,
+    	.delay = 0x00,
+    	.data_mask = 0x00,
     };
 
     struct cam_sensor_i2c_reg_setting i2c_write = {
-	.reg_setting = &i2c_write_setting,
-	.size = 1,
-	.addr_type = CAMERA_SENSOR_I2C_TYPE_WORD,
-	.data_type = CAMERA_SENSOR_I2C_TYPE_DWORD,
-	.delay = 0x00,
+    	.reg_setting = &i2c_write_setting,
+    	.size = 1,
+    	.addr_type = CAMERA_SENSOR_I2C_TYPE_WORD,
+    	.data_type = CAMERA_SENSOR_I2C_TYPE_DWORD,
+    	.delay = 0x00,
     };
 
 	rc = camera_io_dev_write(&(g_ois_ctrl->io_master_info),
@@ -1097,14 +1097,14 @@ int cam_ois_driver_cmd(struct cam_ois_ctrl_t *o_ctrl, void *arg)
 
 		rc = camera_io_dev_read(&(o_ctrl->io_master_info), 0x6040, &gyro_offset_x,
 			CAMERA_SENSOR_I2C_TYPE_WORD, CAMERA_SENSOR_I2C_TYPE_WORD);
-		if (rc < 0) {
+        	if (rc < 0) {
 			CAM_ERR(CAM_OIS, "read gyro offset_x fail");
 		}
 		gyro_offset_x = (gyro_offset_x & 0xFF) << 8 | (gyro_offset_x & 0xFF00) >> 8;
 
 		rc = camera_io_dev_read(&(o_ctrl->io_master_info), 0x6042, &gyro_offset_y,
 			CAMERA_SENSOR_I2C_TYPE_WORD, CAMERA_SENSOR_I2C_TYPE_WORD);
-		if (rc < 0) {
+        	if (rc < 0) {
 			CAM_ERR(CAM_OIS, "read gyro offset_y fail");
 		}
 		gyro_offset_y = (gyro_offset_y & 0xFF) << 8 | (gyro_offset_y & 0xFF00) >> 8;

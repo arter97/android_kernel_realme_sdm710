@@ -305,9 +305,6 @@ static void msm_vfe40_init_hardware_reg(struct vfe_device *vfe_dev)
 	struct msm_vfe_hw_init_parms vbif_parms;
 	struct msm_vfe_hw_init_parms ds_parms;
 
-	if (vfe_used_by_adsp(vfe_dev))
-		return;
-
 	qos_parms.entries = "qos-entries";
 	qos_parms.regs = "qos-regs";
 	qos_parms.settings = "qos-settings";
@@ -749,13 +746,13 @@ static void msm_vfe40_process_epoch_irq(struct vfe_device *vfe_dev,
 		return;
 
 	if (irq_status0 & BIT(2)) {
+		msm_isp_notify(vfe_dev, ISP_EVENT_SOF, VFE_PIX_0, ts);
 		ISP_DBG("%s: EPOCH0 IRQ\n", __func__);
 		msm_isp_process_reg_upd_epoch_irq(vfe_dev, VFE_PIX_0,
 					MSM_ISP_COMP_IRQ_EPOCH, ts);
 		msm_isp_process_stats_reg_upd_epoch_irq(vfe_dev,
 					MSM_ISP_COMP_IRQ_EPOCH);
 		msm_isp_update_error_frame_count(vfe_dev);
-		msm_isp_notify(vfe_dev, ISP_EVENT_SOF, VFE_PIX_0, ts);
 		if (vfe_dev->axi_data.src_info[VFE_PIX_0].raw_stream_count > 0
 			&& vfe_dev->axi_data.src_info[VFE_PIX_0].
 			stream_count == 0) {
@@ -778,9 +775,6 @@ static long msm_vfe40_reset_hardware(struct vfe_device *vfe_dev,
 	spin_lock_irqsave(&vfe_dev->reset_completion_lock, flags);
 	init_completion(&vfe_dev->reset_complete);
 	spin_unlock_irqrestore(&vfe_dev->reset_completion_lock, flags);
-
-	if (vfe_used_by_adsp(vfe_dev))
-		return msecs_to_jiffies(50);
 
 	if (first_start) {
 		msm_camera_io_w_mb(0x1FF, vfe_dev->vfe_base + 0xC);
@@ -1796,9 +1790,6 @@ static int msm_vfe40_axi_halt(struct vfe_device *vfe_dev,
 	enum msm_vfe_input_src i;
 	struct msm_isp_timestamp ts;
 	unsigned long flags;
-
-	if (vfe_used_by_adsp(vfe_dev))
-		return msecs_to_jiffies(50);
 
 	/* Keep only halt and restart mask */
 	msm_vfe40_config_irq(vfe_dev, (1 << 31), (1 << 8),

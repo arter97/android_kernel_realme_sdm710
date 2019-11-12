@@ -345,7 +345,20 @@ int cam_smmu_reserve_sec_heap(int32_t smmu_hdl,
  * @return Status of operation. Negative in case of error. Zero otherwise.
  */
 int cam_smmu_release_sec_heap(int32_t smmu_hdl);
-
+#ifdef VENDOR_EDIT
+//zemin.lai add for qcom patch caseID03917490
+/**
+ * @brief Get start addr & len of I/O region for a given cb
+ *
+ * @param smmu_hdl: SMMU handle identifying the context bank
+ * @param iova: IOVA address of allocated I/O region
+ * @param len: Length of allocated I/O memory
+ *
+ * @return Status of operation. Negative in case of error. Zero otherwise.
+ */
+int cam_smmu_get_io_region_info(int32_t smmu_hdl,
+	dma_addr_t *iova, size_t *len);
+#endif
 /**
  * @brief Allocates qdss for context bank
  *

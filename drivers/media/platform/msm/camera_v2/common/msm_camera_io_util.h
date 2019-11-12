@@ -22,8 +22,6 @@
 #include <media/msm_cam_sensor.h>
 #include <media/v4l2-ioctl.h>
 
-#include <media/adsp-shmem-device.h>
-
 #define NO_SET_RATE -1
 #define INIT_RATE -2
 

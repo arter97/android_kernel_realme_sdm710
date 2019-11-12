@@ -240,7 +240,7 @@ UINT_8 F40_FlashBurstWrite( const UINT_8 *NcDataVal, UINT_32 NcDataLength, UINT_
 
 		RamRead32A( 0xF00C, &UlReadVal ) ;
 	} while ( UlReadVal != 0 ) ;
-
+	
 	return( 0 );
 }
 
@@ -384,9 +384,9 @@ UINT_8 F40_FlashUpdate( UINT_8 flag, DOWNLOAD_TBL* ptr )
 	}
 
     CAM_INFO(CAM_OIS, "F40_FlashUpdate E+++++++++");
-
+    
 	RamRead32A( SiVerNum, &ul_version ) ;						// Read DSP Code Version
-
+	
 //--------------------------------------------------------------------------------
 // 0.
 //--------------------------------------------------------------------------------
@@ -645,17 +645,17 @@ UINT_8 F40_FlashUpdate( UINT_8 flag, DOWNLOAD_TBL* ptr )
 
         RamWrite32A(0xC000, 0x0000000C);
         RamRead32A(0xD000, &check_sum_flag);
-	CAM_INFO(CAM_OIS, "check_sum_flag = 0x%x", check_sum_flag);
+    	CAM_INFO(CAM_OIS, "check_sum_flag = 0x%x", check_sum_flag);
 
         for(UlCnt = 0; UlCnt < 13; UlCnt++) {
-		UINT_8	SectorData[SECTOR_SIZE];
-		UINT_32	top;
-		UINT_16	sec;
-		top = UlCnt * BLOCK_UNIT;
+        	UINT_8	SectorData[SECTOR_SIZE];
+        	UINT_32	top;
+        	UINT_16	sec;
+        	top = UlCnt * BLOCK_UNIT;
 
-		for(sec = 0; sec < (BLOCK_BYTE / SECTOR_SIZE); sec++) {
-			F40_FlashSectorRead(top + sec * 64, SectorData) ;
-		}
+        	for(sec = 0; sec < (BLOCK_BYTE / SECTOR_SIZE); sec++) {
+        		F40_FlashSectorRead(top + sec * 64, SectorData) ;
+        	}
         }
     }
 
@@ -701,7 +701,7 @@ UINT_8	F40_GyroReCalib( stReCalib * pReCalib )
 	UINT_32	UlGofX, UlGofY ;
 	UINT_32	UiChkSum ;
 	UINT_32	UlStCnt = 0;
-
+	
 	F40_ReadCalData( UlBufDat, &UiChkSum );
 
 	RamWrite32A( 0xF014 , 0x00000000 ) ;
@@ -711,8 +711,8 @@ UINT_8	F40_GyroReCalib( stReCalib * pReCalib )
 	} while (UcSndDat != 0 && (UlStCnt++ < CNT100MS ));
 
 	RamRead32A( 0xF014 , &UlRcvDat ) ;
-	UcSndDat = (unsigned char)(UlRcvDat >> 24);
-
+	UcSndDat = (unsigned char)(UlRcvDat >> 24);	
+	
 	if( UlBufDat[ 49 ] == 0xFFFFFFFF )
 		pReCalib->SsFctryOffX = (UlBufDat[ 19 ] >> 16) ;
 	else
@@ -808,13 +808,13 @@ UINT_8	F40_WrGyroOffsetData( void )
 
 //------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------
-		F40_WriteCalData( UlBufDat, &UiChkSum1 );
+		F40_WriteCalData( UlBufDat, &UiChkSum1 );	
 //------------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------------
-		F40_ReadCalData( UlBufDat, &UiChkSum2 );
+		F40_ReadCalData( UlBufDat, &UiChkSum2 );	
 
 		if(UiChkSum1 != UiChkSum2 ){
-			ans = 0x10;
+			ans = 0x10;					
 		}
 	}
 //------------------------------------------------------------------------------------------------
@@ -880,7 +880,7 @@ UINT_8 F40_WriteCalData( UINT_32 * BufDat, UINT_32 * ChkSum )
 	do{
 		F40_IOWrite32A( FLASHROM_F40_ACSCNT, (FLASH_ACCESS_SIZE - 1) ) ;
 		F40_IOWrite32A( FLASHROM_F40_ADR, 0x00010040 + UsSize ) ;
-		F40_IOWrite32A( FLASHROM_F40_CMD, 2) ;
+		F40_IOWrite32A( FLASHROM_F40_CMD, 2) ;  
 		for( UsNum = 0; UsNum < FLASH_ACCESS_SIZE; UsNum++ )
 		{
 			F40_IOWrite32A( FLASHROM_F40_WDATL,  BufDat[ UsSize ] ) ;
@@ -888,11 +888,11 @@ UINT_8 F40_WriteCalData( UINT_32 * BufDat, UINT_32 * ChkSum )
 				F40_IORead32A( FLASHROM_F40_INT, &UlReadVal );
 			}while ( (UlReadVal & 0x00000020) != 0 );
 
-			*ChkSum += BufDat[ UsSize++ ];
+			*ChkSum += BufDat[ UsSize++ ];	
 		}
-	}while (UsSize < 64);
+	}while (UsSize < 64);		
 
-	ans = F40_UnlockCodeClear();
+	ans = F40_UnlockCodeClear();	
 
 	return( ans );
 }
@@ -959,42 +959,42 @@ UINT_16 Accuracy(float ACCURACY, UINT_16 RADIUS, UINT_16 DEGSTEP, UINT_16 WAIT_M
 	RamWrite32A(0x0164, float2fix(ypos));
 	WitTim(WAIT_MSEC1);
 
-	for( deg = 0; deg <= 360; deg += DEGSTEP )
+	for( deg = 0; deg <= 360; deg += DEGSTEP ) 
 	{
 		xpos = xRadius * cos(deg * 3.14159/180);
 		ypos = yRadius * sin(deg * 3.14159/180);
-	RamWrite32A(0x0114, float2fix(xpos));
+    	RamWrite32A(0x0114, float2fix(xpos));
 		RamWrite32A(0x0164, float2fix(ypos));
 
 		xMxHl = 0;
 		yMxHl = 0;
 		WitTim(WAIT_MSEC2);
-
+		
 		for(short i=0; i<3; i++)
 		{
 			WitTim(WAIT_MSEC3);
 			RamRead32A( 0x0118, &xh_value );
 			RamRead32A( 0x0168, &yh_value );
-			if(fabsf(fix2float(xh_value) - xpos) > fabsf(xMxHl))
+			if(fabsf(fix2float(xh_value) - xpos) > fabsf(xMxHl))	
 				xMxHl = fix2float(xh_value) - xpos;
-			if(fabsf(fix2float(yh_value) - ypos) > fabsf(yMxHl))
+			if(fabsf(fix2float(yh_value) - ypos) > fabsf(yMxHl))	
 				yMxHl = fix2float(yh_value) - ypos;
 		}
 
 		if(fabsf(xMxHl) > xMxAc)	xMxAc = fabsf(xMxHl);
 		if(fabsf(yMxHl) > yMxAc)	yMxAc = fabsf(yMxHl);
-
+		
 		xy_raw_data[deg/DEGSTEP].xpos = xpos;
 		xy_raw_data[deg/DEGSTEP].xhall = xMxHl + xpos;
 		xy_raw_data[deg/DEGSTEP].ypos = ypos;
 		xy_raw_data[deg/DEGSTEP].yhall = yMxHl + ypos;
-
-		if(fabsf(xMxHl) > xLimit)	xng++;
-		if(fabsf(yMxHl) > yLimit)	yng++;
+		
+		if(fabsf(xMxHl) > xLimit)	xng++; 
+		if(fabsf(yMxHl) > yLimit)	yng++; 
 
 	}
-	RamWrite32A(0x0114, 0);
-	RamWrite32A(0x0164, 0);
+	RamWrite32A(0x0114, 0); 
+	RamWrite32A(0x0164, 0); 
 
 	return (xng << 8) | yng;
 }
@@ -1023,7 +1023,7 @@ UINT_8	WrChangeCalData_07_0C_DC( UINT_8	uc_index )
 // Sector erase NVR2 Calibration area
 //------------------------------------------------------------------------------------------------
 	ans	= F40_EraseCalData() ;
-
+	
 	if( ans == 0 ) {
 //------------------------------------------------------------------------------------------------
 // Set Calibration data
@@ -1122,3 +1122,6 @@ UINT_8	WrGyroGain( UINT_32 ul_gain_x, UINT_32 ul_gain_y )
 	CAM_INFO(CAM_OIS, "WrGyroGain X--------, ans = %d", ans);
 	return( ans );															// CheckSum OK
 }
+
+
+

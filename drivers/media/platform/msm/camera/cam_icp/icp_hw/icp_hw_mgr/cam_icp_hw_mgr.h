@@ -89,6 +89,10 @@ struct icp_hfi_mem_info {
 	struct cam_mem_mgr_memory_desc fw_buf;
 	struct cam_mem_mgr_memory_desc qdss_buf;
 	struct cam_smmu_region_info shmem;
+#ifdef VENDOR_EDIT
+//zemin.lai add for qcom patch caseID03917490
+	struct cam_smmu_region_info io_mem;
+#endif
 };
 
 /**

@@ -4,7 +4,7 @@
  *		Copyright (C) 2017, ON Semiconductor, all right reserved.
  *
  **/
-
+ 
 #ifndef PHONEUPDATE_H_
 #define PHONEUPDATE_H_
 

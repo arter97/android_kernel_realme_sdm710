@@ -321,7 +321,7 @@ static ssize_t flash_on_off(int is_back_flash)
 }
 
 static ssize_t flash_proc_write(struct file *filp, const char __user *buff,
-				size_t len, loff_t *data)
+                        	size_t len, loff_t *data)
 {
 	char buf[8] = {0};
 	int rc = 0;
@@ -350,7 +350,7 @@ static ssize_t flash_proc_write(struct file *filp, const char __user *buff,
 	return len;
 }
 static ssize_t flash_proc_read(struct file *filp, char __user *buff,
-				size_t len, loff_t *data)
+                        	size_t len, loff_t *data)
 {
 	char value[2] = {0};
 	snprintf(value, sizeof(value), "%d", flash_mode);

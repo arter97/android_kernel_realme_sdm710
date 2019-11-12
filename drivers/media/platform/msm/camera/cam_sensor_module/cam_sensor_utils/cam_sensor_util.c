@@ -35,8 +35,16 @@ static struct i2c_settings_list*
 {
 	struct i2c_settings_list *tmp;
 
+#ifdef VENDOR_EDIT
+/* Zihao.Li@RM.Camera, 2018/12/18, Modify for front camera page allocate failed */
+	tmp = (struct i2c_settings_list *)
+		vmalloc(sizeof(struct i2c_settings_list));
+
+	memset((void*)tmp,0,sizeof(struct i2c_settings_list));
+#else
 	tmp = (struct i2c_settings_list *)
 		kzalloc(sizeof(struct i2c_settings_list), GFP_KERNEL);
+#endif
 
 	if (tmp != NULL)
 		list_add_tail(&(tmp->list),
@@ -44,12 +52,26 @@ static struct i2c_settings_list*
 	else
 		return NULL;
 
+#ifdef VENDOR_EDIT
+/* Zihao.Li@RM.Camera, 2018/12/18, Modify for front camera page allocate failed */
+	tmp->i2c_settings.reg_setting = (struct cam_sensor_i2c_reg_array *)
+		vmalloc(sizeof(struct cam_sensor_i2c_reg_array) * size);
+
+	memset((void*)tmp->i2c_settings.reg_setting, 0, sizeof(struct cam_sensor_i2c_reg_array) * size);
+#else
 	tmp->i2c_settings.reg_setting = (struct cam_sensor_i2c_reg_array *)
 		kzalloc(sizeof(struct cam_sensor_i2c_reg_array) *
 		size, GFP_KERNEL);
+#endif
+
 	if (tmp->i2c_settings.reg_setting == NULL) {
 		list_del(&(tmp->list));
+#ifdef VENDOR_EDIT
+/* Zihao.Li@RM.Camera, 2018/12/18, Modify for front camera page allocate failed */
+		vfree(tmp);
+#else
 		kfree(tmp);
+#endif
 		return NULL;
 	}
 	tmp->i2c_settings.size = size;
@@ -73,18 +95,20 @@ static struct i2c_settings_list*
 		CAM_DBG(CAM_SENSOR, "spc malloc second list %p, reg %p, size %d",i2c_settings_list_vendor,reg_setting_vendor,vendor_size);
 	} else {
 		if (reg_setting_vendor) {
-			kfree(reg_setting_vendor);
+			vfree(reg_setting_vendor);
 			reg_setting_vendor = NULL;
 			vendor_size = 0;
 		}
 
 		if (i2c_settings_list_vendor) {
-			kfree(i2c_settings_list_vendor);
+			vfree(i2c_settings_list_vendor);
 			i2c_settings_list_vendor = NULL;
 		}
 
 		tmp = (struct i2c_settings_list *)
-			kzalloc(sizeof(struct i2c_settings_list), GFP_KERNEL);
+			vmalloc(sizeof(struct i2c_settings_list));
+
+		memset((void*)tmp,0,sizeof(struct i2c_settings_list));
 
 		if (tmp != NULL)
 			list_add_tail(&(tmp->list),
@@ -93,11 +117,14 @@ static struct i2c_settings_list*
 			return NULL;
 
 		reg_setting_vendor = (struct cam_sensor_i2c_reg_array *)
-			kzalloc(sizeof(struct cam_sensor_i2c_reg_array) *
-			size, GFP_KERNEL);
+			vmalloc(sizeof(struct cam_sensor_i2c_reg_array) *
+			size);
+
+		memset((void*)reg_setting_vendor, 0, sizeof(struct cam_sensor_i2c_reg_array) * size);
+
 		if (reg_setting_vendor == NULL) {
 			list_del(&(tmp->list));
-			kfree(tmp);
+			vfree(tmp);
 			return NULL;
 		}
 		tmp->i2c_settings.reg_setting = reg_setting_vendor;
@@ -129,14 +156,14 @@ int32_t delete_request(struct i2c_settings_array *i2c_array)
 		if (i2c_list->resident) {
 		    list_del(&(i2c_list->list));
 		}else {
-		    kfree(i2c_list->i2c_settings.reg_setting);
+		    vfree(i2c_list->i2c_settings.reg_setting);
 		    list_del(&(i2c_list->list));
-		    kfree(i2c_list);
+		    vfree(i2c_list);
 		}
 		#else
-		kfree(i2c_list->i2c_settings.reg_setting);
+		vfree(i2c_list->i2c_settings.reg_setting);
 		list_del(&(i2c_list->list));
-		kfree(i2c_list);
+		vfree(i2c_list);
 		#endif
 	}
 	INIT_LIST_HEAD(&(i2c_array->list_head));
