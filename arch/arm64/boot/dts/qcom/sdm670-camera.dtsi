@@ -244,7 +244,8 @@
 					/* Shared region is 100MB long */
 					iova-region-name = "shared";
 					iova-region-start = <0x7400000>;
-					iova-region-len = <0x6400000>;
+					/*zemin.lai add for qcom patch caseID03917490*/
+					iova-region-len = <0x9600000>;
 					iova-region-id = <0x1>;
 					status = "ok";
 				};

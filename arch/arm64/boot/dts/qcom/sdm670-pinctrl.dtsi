@@ -1,4 +1,4 @@
-/* Copyright (c) 2017-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2017-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -271,7 +271,37 @@
 			};
 		};
 
-		qupv3_se0_spi_pins: qupv3_se0_spi_pins {
+		micbias_supply_en_pins: micbias_supply_en_pins {
+			micbias_supply_en_active: micbias_supply_en_active {
+				mux {
+					pins = "gpio126";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio126";
+					drive-strength = <16>;
+					output-high;
+				};
+			};
+
+			micbias_supply_en_sleep: micbias_supply_en_sleep {
+				mux {
+					pins = "gpio126";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio126";
+					drive-strength = <16>;
+					bias-disable;
+					output-low;
+				};
+			};
+		};
+		//#ifndef VENDOR_EDIT
+		//Fei.Mo@PSW.BSP.Bootloader, 2019/05/08, Add for NC no use gpio
+		/*qupv3_se0_spi_pins: qupv3_se0_spi_pins {
 			qupv3_se0_spi_active: qupv3_se0_spi_active {
 				mux {
 					pins = "gpio0", "gpio1", "gpio2",
@@ -301,7 +331,42 @@
 					bias-disable;
 				};
 			};
+		};*/
+		//#else
+		qupv3_se0_spi_pins: qupv3_se0_spi_pins {
+			qupv3_se0_spi_active: qupv3_se0_spi_active {
+				mux {
+					pins = "gpio0", "gpio1", "gpio2",
+								"gpio3";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio0", "gpio1", "gpio2",
+								"gpio3";
+					drive-strength = <2>;
+					bias-pull-down;
+					input-enable;
+				};
+			};
+
+			qupv3_se0_spi_sleep: qupv3_se0_spi_sleep {
+				mux {
+					pins = "gpio0", "gpio1", "gpio2",
+								"gpio3";
+					function = "gpio";
+				};
+
+				config {
+					pins = "gpio0", "gpio1", "gpio2",
+								"gpio3";
+					drive-strength = <2>;
+					bias-pull-down;
+					input-enable;
+				};
+			};
 		};
+		//#endif VENDOR_EDIT
 
 		/* SE 1 pin mappings */
 		qupv3_se1_i2c_pins: qupv3_se1_i2c_pins {
@@ -449,7 +514,12 @@
 				config {
 					pins = "gpio41", "gpio42";
 					drive-strength = <2>;
-					bias-pull-up;
+					//#ifndef VENDOR_EDIT
+					//Fei.Mo@PSW.BSP.Bootloader, 2019/05/08, Modify for NC no use gpio
+					//bias-pull-up;
+					//#else
+					bias-pull-down;
+					//#endif
 				};
 			};
 		};

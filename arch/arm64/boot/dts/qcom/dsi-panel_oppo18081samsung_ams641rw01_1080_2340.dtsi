@@ -318,11 +318,24 @@
 					39 01 00 00 00 00 03 B1 00 01  /* SEED CRC OFF */
 					39 01 00 00 00 00 03 B3 00 C1  /* TCS OFF */
 					39 01 00 00 00 00 03 F0 A5 A5];
-				qcom,mdss-dsi-seed-srgb-command = [
+				qcom,mdss-dsi-seed-0-command = [
 					15 01 00 00 00 00 02 81 90  /* CRC mode enable */
 					39 01 00 00 00 00 03 F0 5A 5A
 					15 01 00 00 00 00 02 B0 02
 					39 01 00 00 00 00 16 B1 E0 00 08 1C F8 00 04 0F FF 24 FD DC FD 00 F6 F1 F0 00 FF FF FF  /* CRC LUT */
+					39 01 00 00 00 00 03 B1 00 00
+					39 01 00 00 00 00 03 F0 A5 A5
+					39 01 00 00 00 00 03 F0 5A 5A  /* Seed Tcs On */
+					15 01 00 00 00 00 02 B0 23
+					15 01 00 00 00 00 02 B3 91
+					15 01 00 00 00 00 02 83 80
+					39 01 00 00 00 00 03 B3 00 C0
+					39 01 00 00 00 00 03 F0 A5 A5];
+				qcom,mdss-dsi-seed-1-command = [
+					15 01 00 00 00 00 02 81 90  /* CRC mode enable */
+					39 01 00 00 00 00 03 F0 5A 5A
+					15 01 00 00 00 00 02 B0 02
+					39 01 00 00 00 00 16 B1 E0 02 07 4B DF 15 08 0B D3 55 ED D0 C0 0D C8 EC EA 1D FF FF FF  /* CRC LUT */
 					39 01 00 00 00 00 03 B1 00 00
 					39 01 00 00 00 00 03 F0 A5 A5
 					39 01 00 00 00 00 03 F0 5A 5A  /* Seed Tcs On */
@@ -379,7 +392,7 @@
 		qcom,mdss-dsi-lane-3-state;
 		qcom,mdss-pan-physical-width-dimension = <69>;
 		qcom,mdss-pan-physical-height-dimension = <148>;
-		qcom,mdss-dsi-reset-sequence = <1 5>, <0 2>, <1 10>;
+		qcom,mdss-dsi-reset-sequence = <1 10>, <0 5>, <1 10>;
 		qcom,mdss-dsi-dma-trigger = "trigger_sw";
 		qcom,mdss-dsi-mdp-trigger = "none";
 		qcom,mdss-dsi-t-clk-post = <0x0f>;
@@ -512,9 +525,9 @@
 					39 01 00 00 00 00 03 9F 5A 5A
 					/* AOD ON */
 					39 01 00 00 00 00 03 F0 5A 5A
-					15 01 00 00 00 00 02 53 22
+					15 01 00 00 00 00 02 53 23
 					15 01 00 00 00 00 02 B0 A5
-					15 01 00 00 00 00 02 C7 00
+					15 01 00 00 73 00 02 C7 00
 					39 01 00 00 00 00 03 F0 A5 A5
 					/* Seed CRC mode enable */
 					15 01 00 00 00 00 02 81 90
@@ -542,11 +555,7 @@
 					39 01 00 00 00 00 03 F0 5A 5A
 					15 01 00 00 00 00 02 B0 01
 					15 01 00 00 00 00 02 CD 01
-                                        39 01 00 00 14 00 03 F0 A5 A5
-					/* TE vsync ON */
-					39 01 00 00 00 00 03 9F A5 A5
-					15 01 00 00 00 00 02 35 00
-					39 01 00 00 00 00 03 9F 5A 5A
+					39 01 00 00 00 00 03 F0 A5 A5
 					/* MIC Setting */
 					39 01 00 00 00 00 03 F0 5A 5A
 					39 01 00 00 00 00 08 EB 17 41 92 0E 10 82 5A
@@ -560,7 +569,7 @@
 					15 01 00 00 00 00 02 E3 88
 					15 01 00 00 00 00 02 B0 07
 					15 01 00 00 00 00 02 ED 67
-					39 01 00 00 3C 00 03 FC A5 A5
+					39 01 00 00 00 00 03 FC A5 A5
 					/* Backlight Dimming Setting */
 					39 01 00 00 00 00 03 F0 5A 5A
 					15 01 00 00 00 00 02 B0 08
@@ -650,11 +659,25 @@
 					39 01 00 00 00 00 03 B3 00 C1  /* TCS OFF */
 					39 01 00 00 00 00 03 F0 A5 A5
                                         ];
-				qcom,mdss-dsi-seed-srgb-command = [
+				qcom,mdss-dsi-seed-0-command = [
 					15 01 00 00 00 00 02 81 90  /* CRC mode enable */
 					39 01 00 00 00 00 03 F0 5A 5A
 					15 01 00 00 00 00 02 B0 02
 					39 01 00 00 00 00 16 B1 E0 00 08 1C F8 00 04 0F FF 24 FD DC FD 00 F6 F1 F0 00 FF FF FF  /* CRC LUT */
+					39 01 00 00 00 00 03 B1 00 00
+					39 01 00 00 00 00 03 F0 A5 A5
+					39 01 00 00 00 00 03 F0 5A 5A  /* Seed Tcs On */
+					15 01 00 00 00 00 02 B0 23
+					15 01 00 00 00 00 02 B3 91
+					15 01 00 00 00 00 02 83 80
+					39 01 00 00 00 00 03 B3 00 C0
+					39 01 00 00 00 00 03 F0 A5 A5
+                                        ];
+				qcom,mdss-dsi-seed-1-command = [
+					15 01 00 00 00 00 02 81 90  /* CRC mode enable */
+					39 01 00 00 00 00 03 F0 5A 5A
+					15 01 00 00 00 00 02 B0 02
+					39 01 00 00 00 00 16 B1 E0 02 07 4B DF 15 08 0B D3 55 ED D0 C0 0D C8 EC EA 1D FF FF FF  /* CRC LUT */
 					39 01 00 00 00 00 03 B1 00 00
 					39 01 00 00 00 00 03 F0 A5 A5
 					39 01 00 00 00 00 03 F0 5A 5A  /* Seed Tcs On */

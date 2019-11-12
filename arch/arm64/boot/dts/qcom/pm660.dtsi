@@ -269,7 +269,19 @@
                 qcom,cal-val = <0>;
 			};
 			//#endif
-
+			//#ifdef VENDOR_EDIT /* tongfeng.Huang@BSP.CHG.Basic, 2018/05/08,  Add for charging USB BTB TEMP*/
+			chan@14 {
+				label = "gpio4_adc";
+				reg = <0x14>; //channel for GPIO4
+				qcom,decimation = <2>;
+				qcom,pre-div-channel-scaling = <0>; //1:1 scaling
+				qcom,calibration-type = "absolute";
+				qcom,scale-function = <0>;
+				qcom,hw-settle-time = <2>;
+				qcom,fast-avg-setup = <0>;
+                qcom,cal-val = <0>;
+			};
+			//#endif
 		};
 
 		pm660_pdphy: qcom,usb-pdphy@1700 {
