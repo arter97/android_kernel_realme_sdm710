@@ -255,7 +255,12 @@
 		dmas = <&gpi_dma0 0 0 1 64 0>,
 			<&gpi_dma0 1 0 1 64 0>;
 		dma-names = "tx", "rx";
-		status = "disabled";
+		/* #ifndef VENDOR_EDIT */
+		/* Fei.Mo@PSW.BSP.Bootloader, 2019/05/08, Add for NC no use gpio */
+		//status = "disabled";
+		/* #else */
+		status = "ok";
+		/* #endif VENDOR_EDIT */
 	};
 
 	qupv3_se1_spi: spi@884000 {
