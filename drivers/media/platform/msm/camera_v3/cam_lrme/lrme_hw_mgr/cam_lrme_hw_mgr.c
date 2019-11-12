@@ -871,8 +871,7 @@ static int cam_lrme_mgr_hw_prepare_update(void *hw_mgr_priv,
 		kmd_buf.size, kmd_buf.used_bytes);
 
 	rc = cam_packet_util_process_patches(args->packet,
-		hw_mgr->device_iommu.non_secure,
-		hw_mgr->device_iommu.secure, 0);
+		hw_mgr->device_iommu.non_secure, hw_mgr->device_iommu.secure);
 	if (rc) {
 		CAM_ERR(CAM_LRME, "Patch packet failed, rc=%d", rc);
 		return rc;

@@ -154,7 +154,12 @@ struct csiphy_reg_t
 		{0x0008, 0x00, 0x00, CSIPHY_SETTLE_CNT_LOWER_BYTE},
 		{0x0010, 0x52, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0038, 0xFE, 0x00, CSIPHY_DEFAULT_PARAMS},
+		#ifdef VENDOR_EDIT
+		/*Xiaoyang.Huang@RM.Camera modify to fix combo mode issue,20190516*/
+		{0x0060, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+		#else
 		{0x0060, 0x01, 0x00, CSIPHY_DEFAULT_PARAMS},
+		#endif
 		{0x0064, 0x7F, 0x00, CSIPHY_DEFAULT_PARAMS},
 	},
 	{
@@ -170,7 +175,12 @@ struct csiphy_reg_t
 		{0x070C, 0xA5, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0710, 0x52, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0738, 0x1F, 0x00, CSIPHY_DEFAULT_PARAMS},
+		#ifdef VENDOR_EDIT
+		/*Xiaoyang.Huang@RM.Camera modify to fix combo mode issue,20190516*/
+		{0x0760, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+		#else
 		{0x0760, 0x01, 0x00, CSIPHY_DEFAULT_PARAMS},
+		#endif
 		{0x0764, 0x7F, 0x00, CSIPHY_DEFAULT_PARAMS},
 	},
 	{
@@ -185,7 +195,12 @@ struct csiphy_reg_t
 		{0x0208, 0x00, 0x00, CSIPHY_SETTLE_CNT_LOWER_BYTE},
 		{0x0210, 0x52, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0238, 0xFE, 0x00, CSIPHY_DEFAULT_PARAMS},
+		#ifdef VENDOR_EDIT
+		/*Xiaoyang.Huang@RM.Camera modify to fix combo mode issue,20190516*/
+		{0x0260, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+		#else
 		{0x0260, 0x01, 0x00, CSIPHY_DEFAULT_PARAMS},
+		#endif
 		{0x0264, 0x7F, 0x00, CSIPHY_DEFAULT_PARAMS},
 	},
 	{
@@ -200,7 +215,12 @@ struct csiphy_reg_t
 		{0x0408, 0x00, 0x00, CSIPHY_SETTLE_CNT_LOWER_BYTE},
 		{0x0410, 0x52, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0438, 0xFE, 0x00, CSIPHY_DEFAULT_PARAMS},
+		#ifdef VENDOR_EDIT
+		/*Xiaoyang.Huang@RM.Camera modify to fix combo mode issue,20190516*/
+		{0x0460, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+		#else
 		{0x0460, 0x01, 0x00, CSIPHY_DEFAULT_PARAMS},
+		#endif
 		{0x0464, 0x7F, 0x00, CSIPHY_DEFAULT_PARAMS},
 	},
 	{
@@ -216,7 +236,12 @@ struct csiphy_reg_t
 		{0x060C, 0xA5, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0610, 0x52, 0x00, CSIPHY_DEFAULT_PARAMS},
 		{0x0638, 0x1F, 0x00, CSIPHY_DEFAULT_PARAMS},
+		#ifdef VENDOR_EDIT
+		/*Xiaoyang.Huang@RM.Camera modify to fix combo mode issue,20190516*/
+		{0x0660, 0x00, 0x00, CSIPHY_DEFAULT_PARAMS},
+		#else
 		{0x0660, 0x01, 0x00, CSIPHY_DEFAULT_PARAMS},
+		#endif
 		{0x0664, 0x7F, 0x00, CSIPHY_DEFAULT_PARAMS},
 	},
 };

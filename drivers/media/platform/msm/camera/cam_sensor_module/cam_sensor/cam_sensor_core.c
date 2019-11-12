@@ -1193,6 +1193,11 @@ void cam_sensor_shutdown(struct cam_sensor_ctrl_t *s_ctrl)
 /*add by yufeng@camera, 20181222 for get sensor version*/
 #define SONY_SENSOR_MP0 (0x02)  //imx586 cut0.9(0X00)\cut0.91(0X01\0x02)
 #define SONY_SENSOR_MP1 (0x03)  //imx586 cut1.0(0x03\0x04\0x10)\MP (0x1X)
+/* Huanyun.Tang@RM.Cam, 20190722, add for get sensor version */
+#define S5kGW1_SENSOR_ID   (0x971)   //s5kgw1 sensor id(0x971)
+#define S5KGW1_VERSION_REG (0x0002)  //s5kgw1 version register address(0x0002)
+#define SAMSUNG_SENSOR_MP1 (0xA101)  //s5kgw1 evt0.1(0xA101)
+#define SAMSUNG_SENSOR_MP2 (0xA201)  //s5kgw1 evt0.2(0xA201)
 #endif
 int cam_sensor_match_id(struct cam_sensor_ctrl_t *s_ctrl)
 {
@@ -1228,7 +1233,8 @@ int cam_sensor_match_id(struct cam_sensor_ctrl_t *s_ctrl)
 #ifdef VENDOR_EDIT
 /* wanghaoran@camera.driver. 2018/11/2, add for read sensor gc5035 of camera */
     if (slave_info->sensor_id == 0x5035
-         || slave_info->sensor_id == 0x2375) {
+         || slave_info->sensor_id == 0x2375
+         || slave_info->sensor_id == 0x2509) {
          gc5035_high = slave_info->sensor_id_reg_addr & 0xff00;
          gc5035_high = gc5035_high >> 8;
          gc5035_low = slave_info->sensor_id_reg_addr & 0x00ff;
@@ -1362,6 +1368,25 @@ int cam_sensor_match_id(struct cam_sensor_ctrl_t *s_ctrl)
 		}
 	}
 
+	/* Huanyun.Tang@RM.Cam, 20190722, add for get sensor version */
+	if (chipid == S5kGW1_SENSOR_ID) {
+		rc = camera_io_dev_read(
+			&(s_ctrl->io_master_info),
+			S5KGW1_VERSION_REG,
+			&sensor_version, CAMERA_SENSOR_I2C_TYPE_WORD,
+			CAMERA_SENSOR_I2C_TYPE_WORD);
+
+		CAM_INFO(CAM_SENSOR, "s5kgw1 sensor_version: 0x%x",
+				sensor_version);
+		if (sensor_version == SAMSUNG_SENSOR_MP1) {
+			s_ctrl->sensordata->slave_info.sensor_version = 0;
+		} else if (sensor_version == SAMSUNG_SENSOR_MP2){
+			s_ctrl->sensordata->slave_info.sensor_version = 1;
+		}
+		CAM_INFO(CAM_SENSOR, "s5kgw1 slave_info.sensor_version: %d:",
+				s_ctrl->sensordata->slave_info.sensor_version);
+	}
+
 	if (slave_info->sensor_id == 0x519 && fuse_id[0] == '\0') {
 		sensor_get_fuseid(s_ctrl);
 		CAM_ERR(CAM_SENSOR,
@@ -1379,7 +1404,10 @@ int cam_sensor_match_id(struct cam_sensor_ctrl_t *s_ctrl)
 	if (slave_info->sensor_id == 0x0586) {
 		if (i2c_settings_list_vendor == NULL) {
 			i2c_settings_list_vendor = (struct i2c_settings_list *)
-				kzalloc(sizeof(struct i2c_settings_list), GFP_KERNEL);
+				vmalloc(sizeof(struct i2c_settings_list));
+
+			memset((void*)i2c_settings_list_vendor, 0, sizeof(struct i2c_settings_list));
+
 			if (i2c_settings_list_vendor)
 				CAM_DBG(CAM_SENSOR,"imx586 probe spc malloc list sucess,list %p",i2c_settings_list_vendor);
 		}
@@ -1387,8 +1415,11 @@ int cam_sensor_match_id(struct cam_sensor_ctrl_t *s_ctrl)
 		if (reg_setting_vendor == NULL) {
 			vendor_size = IMX586QSC_SIZE;
 			reg_setting_vendor = (struct cam_sensor_i2c_reg_array *)
-				kzalloc(sizeof(struct cam_sensor_i2c_reg_array) *
-				vendor_size, GFP_KERNEL);
+				vmalloc(sizeof(struct cam_sensor_i2c_reg_array) *
+				vendor_size);
+
+			memset((void*)reg_setting_vendor, 0, sizeof(struct cam_sensor_i2c_reg_array) * vendor_size);
+
 			if (reg_setting_vendor)
 				CAM_DBG(CAM_SENSOR,"imx586  probe spc malloc reg sucess reg %p",reg_setting_vendor);
 		}

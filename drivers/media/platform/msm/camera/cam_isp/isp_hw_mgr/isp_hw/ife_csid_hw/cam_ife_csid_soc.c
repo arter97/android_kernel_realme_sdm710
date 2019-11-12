@@ -141,9 +141,14 @@ int cam_ife_csid_enable_soc_resources(struct cam_hw_soc_info *soc_info)
 		rc = -EFAULT;
 		goto end;
 	}
-
+#ifdef VENDOR_EDIT
+/* Huanyun.Tang@RM.Camera modify clk_level to CAM_TURBO_VOTE,20190621 */
+	rc = cam_soc_util_enable_platform_resource(soc_info, true,
+		CAM_TURBO_VOTE, true);
+#else
 	rc = cam_soc_util_enable_platform_resource(soc_info, true,
 		CAM_SVS_VOTE, true);
+#endif
 	if (rc) {
 		CAM_ERR(CAM_ISP, "enable platform failed");
 		goto stop_cpas;

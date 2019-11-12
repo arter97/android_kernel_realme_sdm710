@@ -72,8 +72,23 @@ int32_t camera_io_dev_read_seq(struct camera_io_master *io_master_info,
 	enum camera_sensor_i2c_type addr_type, int32_t num_bytes)
 {
 	if (io_master_info->master_type == CCI_MASTER) {
+#ifdef VENDOR_EDIT
+/* Huanyun.Tang@Camera.Driver, 20190514, add for hi846 otp */
+		if (addr == 0xFEFE) {
+			int i;
+			addr = 0x0708;
+			for (i = 0; i < num_bytes; i++) {
+				cam_camera_cci_i2c_read_seq(io_master_info->cci_client,
+				addr, &data[i], addr_type, 1);
+			}
+		} else {
+			return cam_camera_cci_i2c_read_seq(io_master_info->cci_client,
+				addr, data, addr_type, num_bytes);
+		}
+#else
 		return cam_camera_cci_i2c_read_seq(io_master_info->cci_client,
 			addr, data, addr_type, num_bytes);
+#endif
 	} else if (io_master_info->master_type == I2C_MASTER) {
 		return cam_qup_i2c_read_seq(io_master_info->client,
 			addr, data, addr_type, num_bytes);

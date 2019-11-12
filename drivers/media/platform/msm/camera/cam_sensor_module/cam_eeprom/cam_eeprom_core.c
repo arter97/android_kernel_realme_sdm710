@@ -42,6 +42,10 @@ static int cam_eeprom_read_memory(struct cam_eeprom_ctrl_t *e_ctrl,
 		return -EINVAL;
 	}
 
+#ifdef VENDOR_EDIT
+/* Huanyun.Tang@Camera.Driver, 20190514, add for hi846 otp */
+	memset(&i2c_reg_settings, 0, sizeof(struct cam_sensor_i2c_reg_setting));
+#endif
 	eb_info = (struct cam_eeprom_soc_private *)e_ctrl->soc_info.soc_private;
 
 	for (j = 0; j < block->num_map; j++) {
