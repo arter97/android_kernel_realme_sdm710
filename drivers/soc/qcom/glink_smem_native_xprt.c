@@ -940,6 +940,7 @@ static void __rx_worker(struct edge_info *einfo, bool atomic_ctx)
 	char trash[FIFO_ALIGNMENT];
 	struct deferred_cmd *d_cmd;
 	void *cmd_data;
+	bool ret = false;
 
 	rcu_id = srcu_read_lock(&einfo->use_ref);
 
@@ -948,11 +949,18 @@ static void __rx_worker(struct edge_info *einfo, bool atomic_ctx)
 		return;
 	}
 
+	spin_lock_irqsave(&einfo->rx_lock, flags);
 	if (!einfo->rx_fifo) {
-		if (!get_rx_fifo(einfo))
+		ret = get_rx_fifo(einfo);
+		if (!ret) {
+			spin_unlock_irqrestore(&einfo->rx_lock, flags);
+			srcu_read_unlock(&einfo->use_ref, rcu_id);
 			return;
-		einfo->xprt_if.glink_core_if_ptr->link_up(&einfo->xprt_if);
+		}
 	}
+	spin_unlock_irqrestore(&einfo->rx_lock, flags);
+	if (ret)
+		einfo->xprt_if.glink_core_if_ptr->link_up(&einfo->xprt_if);
 
 	if ((atomic_ctx) && ((einfo->tx_resume_needed)
 	    || (einfo->tx_blocked_signal_sent)
@@ -1560,24 +1568,22 @@ static void tx_cmd_ch_remote_close_ack(struct glink_transport_if *if_ptr,
 static void subsys_up(struct glink_transport_if *if_ptr)
 {
 	struct edge_info *einfo;
+	unsigned long flags;
+	bool ret = false;
 
 	einfo = container_of(if_ptr, struct edge_info, xprt_if);
-#ifndef VENDOR_EDIT
 	einfo->in_ssr = false;
-#endif
+	spin_lock_irqsave(&einfo->rx_lock, flags);
 	if (!einfo->rx_fifo) {
-		if (!get_rx_fifo(einfo))
+		ret = get_rx_fifo(einfo);
+		if (!ret) {
+			spin_unlock_irqrestore(&einfo->rx_lock, flags);
 			return;
-
-#ifdef VENDOR_EDIT
-		einfo->in_ssr = false;
-#endif
-		einfo->xprt_if.glink_core_if_ptr->link_up(&einfo->xprt_if);
+		}
 	}
-#ifdef VENDOR_EDIT
-	else
-		einfo->in_ssr = false;
-#endif
+	spin_unlock_irqrestore(&einfo->rx_lock, flags);
+	if (ret)
+		einfo->xprt_if.glink_core_if_ptr->link_up(&einfo->xprt_if);
 }
 
 /**
