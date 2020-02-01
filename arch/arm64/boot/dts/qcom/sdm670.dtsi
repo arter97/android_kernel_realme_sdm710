@@ -747,16 +747,6 @@
 			size = <0 0x2400000>;
 		};
 
-		ramoops: ramoops@b5000000 {
-			compatible = "ramoops";
-			reg = <0 0xb5000000 0 0x00200000>;
-
-			console-size = <0x00080000>;
-			pmsg-size    = <0x00040000>;
-			record-size  = <0x00008000>;
-			ftrace-size  = <0x00020000>;
-		};
-
 		/* global autoconfigured region for contiguous allocations */
 		linux,cma {
 			compatible = "shared-dma-pool";
@@ -3092,6 +3082,7 @@
 			bits = <0 30>; /* Access 30 bits from bit offset 0 */
 		};
 	};
+
 };
 
 #include "pm660.dtsi"
