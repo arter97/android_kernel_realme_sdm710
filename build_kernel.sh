@@ -3,8 +3,8 @@ export KERNELDIR=`readlink -f .`
 export RAMFS_SOURCE=`readlink -f $KERNELDIR/ramdisk`
 export PARTITION_SIZE=67108864
 
-export OS="9.0.0"
-export SPL="2019-09"
+export OS="10.0.0"
+export SPL="2020-01"
 
 echo "kerneldir = $KERNELDIR"
 echo "ramfs_source = $RAMFS_SOURCE"
