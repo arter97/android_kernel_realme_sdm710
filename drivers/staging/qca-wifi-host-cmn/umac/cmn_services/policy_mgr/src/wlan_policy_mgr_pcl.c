@@ -460,21 +460,24 @@ static QDF_STATUS
 policy_mgr_modify_pcl_based_on_srd(struct wlan_objmgr_psoc *psoc,
 				   uint8_t *pcl_list_org,
 				   uint8_t *weight_list_org,
-				   uint32_t *pcl_len_org)
+				   uint32_t *pcl_len_org,
+				   enum QDF_OPMODE vdev_opmode)
 {
 	uint32_t i, pcl_len = 0;
 	uint8_t pcl_list[QDF_MAX_NUM_CHAN];
 	uint8_t weight_list[QDF_MAX_NUM_CHAN];
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	bool is_etsi13_srd_chan_allowed_in_mas_mode = true;
+	bool is_etsi13_srd_chan_allowed_in_mas_mode;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
 		policy_mgr_err("Invalid Context");
 		return QDF_STATUS_E_FAILURE;
 	}
+
 	is_etsi13_srd_chan_allowed_in_mas_mode =
-		wlan_reg_is_etsi13_srd_chan_allowed_master_mode(pm_ctx->pdev);
+		wlan_reg_is_etsi13_srd_chan_allowed_master_mode(pm_ctx->pdev,
+								vdev_opmode);
 
 	if (is_etsi13_srd_chan_allowed_in_mas_mode)
 		return QDF_STATUS_SUCCESS;
@@ -506,7 +509,10 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 			uint32_t *len)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-	uint32_t i;
+	bool mandatory_modified_pcl = false;
+	bool nol_modified_pcl = false;
+	bool dfs_modified_pcl = false;
+	bool modified_final_pcl = false;
 
 	if (policy_mgr_is_sap_mandatory_channel_set(psoc)) {
 		status = policy_mgr_modify_sap_pcl_based_on_mandatory_channel(
@@ -516,10 +522,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 				"failed to get mandatory modified pcl for SAP");
 			return status;
 		}
-		policy_mgr_debug("mandatory modified pcl len:%d", *len);
-		for (i = 0; i < *len; i++)
-			policy_mgr_debug("chan:%d weight:%d",
-				pcl_channels[i], pcl_weight[i]);
+		mandatory_modified_pcl = true;
 	}
 
 	status = policy_mgr_modify_sap_pcl_based_on_nol(
@@ -528,10 +531,7 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 		policy_mgr_err("failed to get nol modified pcl for SAP");
 		return status;
 	}
-	policy_mgr_debug("nol modified pcl len:%d", *len);
-	for (i = 0; i < *len; i++)
-		policy_mgr_debug("chan:%d weight:%d",
-			pcl_channels[i], pcl_weight[i]);
+	nol_modified_pcl = true;
 
 	status = policy_mgr_modify_sap_pcl_based_on_dfs(
 			psoc, pcl_channels, pcl_weight, len);
@@ -539,21 +539,22 @@ static QDF_STATUS policy_mgr_pcl_modification_for_sap(
 		policy_mgr_err("failed to get dfs modified pcl for SAP");
 		return status;
 	}
-	policy_mgr_debug("dfs modified pcl len:%d", *len);
-	for (i = 0; i < *len; i++)
-		policy_mgr_debug("chan:%d weight:%d",
-				 pcl_channels[i], pcl_weight[i]);
+	dfs_modified_pcl = true;
 
 	status = policy_mgr_modify_pcl_based_on_srd
-			(psoc, pcl_channels, pcl_weight, len);
+			(psoc, pcl_channels, pcl_weight, len,
+			 QDF_SAP_MODE);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("failed to get srd modified pcl for SAP");
 		return status;
 	}
-	policy_mgr_debug("modified final pcl len:%d", *len);
-	for (i = 0; i < *len; i++)
-		policy_mgr_debug("chan:%d weight:%d",
-				 pcl_channels[i], pcl_weight[i]);
+	modified_final_pcl = true;
+
+	policy_mgr_debug(" %d %d %d %d",
+			 mandatory_modified_pcl,
+			 nol_modified_pcl,
+			 dfs_modified_pcl,
+			 modified_final_pcl);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -565,7 +566,6 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
 	struct policy_mgr_psoc_priv_obj *pm_ctx;
-	uint32_t i;
 
 	pm_ctx = policy_mgr_get_context(psoc);
 	if (!pm_ctx) {
@@ -580,15 +580,14 @@ static QDF_STATUS policy_mgr_pcl_modification_for_p2p_go(
 		return status;
 	}
 	status = policy_mgr_modify_pcl_based_on_srd
-			(psoc, pcl_channels, pcl_weight, len);
+			(psoc, pcl_channels, pcl_weight, len,
+			 QDF_P2P_GO_MODE);
 	if (QDF_IS_STATUS_ERROR(status)) {
 		policy_mgr_err("failed to get modified pcl for SAP");
 		return status;
 	}
-	policy_mgr_debug("modified pcl len:%d", *len);
-	for (i = 0; i < *len; i++)
-		policy_mgr_debug("chan:%d weight:%d",
-			pcl_channels[i], pcl_weight[i]);
+
+	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
 
 	return QDF_STATUS_SUCCESS;
 }
@@ -628,7 +627,7 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 			uint8_t *pcl_weight, uint32_t weight_len)
 {
 	QDF_STATUS status = QDF_STATUS_E_FAILURE;
-	uint32_t num_connections = 0, i;
+	uint32_t num_connections = 0;
 	enum policy_mgr_conc_priority_mode first_index = 0;
 	enum policy_mgr_one_connection_mode second_index = 0;
 	enum policy_mgr_pcl_type pcl = PM_NONE;
@@ -722,10 +721,6 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 		break;
 	}
 
-	policy_mgr_debug("index1:%d index2:%d pcl:%d dbs:%d",
-		first_index, second_index,
-		pcl, policy_mgr_is_hw_dbs_capable(psoc));
-
 	/* once the PCL enum is obtained find out the exact channel list with
 	 * help from sme_get_cfg_valid_channels
 	 */
@@ -737,11 +732,7 @@ QDF_STATUS policy_mgr_get_pcl(struct wlan_objmgr_psoc *psoc,
 		return status;
 	}
 
-	policy_mgr_debug("pcl len:%d", *len);
-	for (i = 0; i < *len; i++) {
-		policy_mgr_debug("chan:%d weight:%d",
-				pcl_channels[i], pcl_weight[i]);
-	}
+	policy_mgr_dump_channel_list(*len, pcl_channels, pcl_weight);
 
 	policy_mgr_mode_specific_modification_on_pcl(
 		psoc, pcl_channels, pcl_weight, len, mode);
@@ -1918,14 +1909,53 @@ uint8_t policy_mgr_get_alternate_channel_for_sap(
 {
 	uint8_t pcl_channels[QDF_MAX_NUM_CHAN];
 	uint8_t pcl_weight[QDF_MAX_NUM_CHAN];
-	uint8_t channel = 0;
 	uint32_t pcl_len = 0;
 
 	if (QDF_STATUS_SUCCESS == policy_mgr_get_pcl(psoc, PM_SAP_MODE,
 		&pcl_channels[0], &pcl_len,
 		pcl_weight, QDF_ARRAY_SIZE(pcl_weight))) {
-		channel = pcl_channels[0];
+		if (pcl_len)
+			return pcl_channels[0];
 	}
 
-	return channel;
+	return 0;
+}
+
+/*
+ * Buffer len size to consider the 4 char freq, 3 char weight, 2 char
+ * for open close brackets and space and a space, Total 10
+ */
+#define CHAN_WEIGHT_CHAR_LEN 10
+#define MAX_CHAN_TO_PRINT 39
+
+bool policy_mgr_dump_channel_list(uint32_t len, uint8_t *pcl_channels,
+				  uint8_t *pcl_weight)
+{
+	uint32_t idx, buff_len, num = 0, count = 0;
+	char *chan_buff = NULL;
+
+	buff_len = (QDF_MIN(len, MAX_CHAN_TO_PRINT) * CHAN_WEIGHT_CHAR_LEN) + 1;
+	chan_buff = qdf_mem_malloc(buff_len);
+	if (!chan_buff)
+		return false;
+
+	policymgr_nofl_debug("Total PCL Chan Freq %d", len);
+	for (idx = 0; idx < len && idx < QDF_MAX_NUM_CHAN; idx++) {
+		num += qdf_scnprintf(chan_buff + num, buff_len - num, " %d[%d]",
+				     pcl_channels[idx], pcl_weight[idx]);
+		count++;
+		if (count >= MAX_CHAN_TO_PRINT) {
+			/* Print the MAX_CHAN_TO_PRINT channels */
+			policymgr_nofl_debug("Chan[weight]:%s", chan_buff);
+			count = 0;
+			num = 0;
+		}
+	}
+	/* Print any pending channels */
+	if (num)
+		policymgr_nofl_debug("Chan[weight]:%s", chan_buff);
+
+	qdf_mem_free(chan_buff);
+
+	return true;
 }

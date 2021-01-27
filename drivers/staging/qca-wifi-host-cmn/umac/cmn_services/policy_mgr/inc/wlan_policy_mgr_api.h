@@ -2263,6 +2263,16 @@ bool policy_mgr_is_safe_channel(struct wlan_objmgr_psoc *psoc,
 bool policy_mgr_is_force_scc(struct wlan_objmgr_psoc *psoc);
 
 /**
+ * policy_mgr_go_scc_enforced() - Get GO force SCC enabled or not
+ * @psoc: psoc object
+ *
+ * This function checks if force SCC logic should be used on GO interface.
+ *
+ * Return: True if allow GO force SCC
+ */
+bool policy_mgr_go_scc_enforced(struct wlan_objmgr_psoc *psoc);
+
+/**
  * policy_mgr_valid_sap_conc_channel_check() - checks & updates
  * the channel SAP to come up on in case of STA+SAP concurrency
  * @psoc: PSOC object information
@@ -2635,6 +2645,19 @@ void policy_mgr_update_user_config_sap_chan(
  */
 bool policy_mgr_is_sap_restart_required_after_sta_disconnect(
 			struct wlan_objmgr_psoc *psoc, uint8_t *intf_ch);
+
+/**
+ * policy_mgr_dump_channel_list() - Print channel list
+ * @len: Length of pcl list
+ * @pcl_channels: pcl channels list
+ * @pcl_weight: pcl weight list
+ *
+ *
+ * Return: True or false
+ */
+bool policy_mgr_dump_channel_list(uint32_t len,
+				  uint8_t *pcl_channels,
+				  uint8_t *pcl_weight);
 
 /**
  * policy_mgr_is_sta_sap_scc() - check whether SAP is doing SCC with

@@ -167,6 +167,9 @@ enum channel_enum {
 
 	NUM_CHANNELS,
 
+	MIN_CHANNEL = CHAN_ENUM_1,
+	MAX_CHANNEL = (NUM_CHANNELS - 1),
+
 	MIN_24GHZ_CHANNEL = CHAN_ENUM_1,
 	MAX_24GHZ_CHANNEL = CHAN_ENUM_14,
 	NUM_24GHZ_CHANNELS = (MAX_24GHZ_CHANNEL - MIN_24GHZ_CHANNEL + 1),
@@ -234,6 +237,9 @@ enum channel_enum {
 	CHAN_ENUM_173,
 
 	NUM_CHANNELS,
+
+	MIN_CHANNEL = CHAN_ENUM_1,
+	MAX_CHANNEL = (NUM_CHANNELS - 1),
 
 	MIN_24GHZ_CHANNEL = CHAN_ENUM_1,
 	MAX_24GHZ_CHANNEL = CHAN_ENUM_14,
@@ -612,6 +618,16 @@ struct reg_start_11d_scan_req {
 };
 
 /**
+ * struct reg_11d_scan_msg: 11d scan message structure
+ * @psoc: pointer to psoc object
+ * @enable_11d_supp: enable 11d scan or disable 11d scan
+ */
+struct reg_11d_scan_msg {
+	struct wlan_objmgr_psoc *psoc;
+	bool enable_11d_supp;
+};
+
+/**
  * struct reg_stop_11d_scan_req: stop 11d scan request
  * @vdev_id: vdev id
  */
@@ -869,7 +885,7 @@ struct reg_config_vars {
 	uint32_t indoor_chan_enabled;
 	uint32_t force_ssc_disable_indoor_channel;
 	enum restart_beaconing_on_ch_avoid_rule restart_beaconing;
-	bool enable_srd_chan_in_master_mode;
+	uint8_t enable_srd_chan_in_master_mode;
 	bool enable_11d_in_world_mode;
 };
 
