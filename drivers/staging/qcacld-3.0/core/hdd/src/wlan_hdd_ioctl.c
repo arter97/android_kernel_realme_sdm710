@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -42,6 +42,7 @@
 #include <sir_api.h>
 #endif
 #include "hif.h"
+#include "qdf_func_tracker.h"
 
 #if defined(LINUX_QCMBR)
 #define SIOCIOCTLTX99 (SIOCDEVPRIVATE+13)
@@ -830,6 +831,31 @@ QDF_STATUS hdd_wma_send_fastreassoc_cmd(struct hdd_adapter *adapter,
 }
 #endif
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0))
+/**
+ * hdd_is_fast_reassoc_allowed  - check if roam offload is enabled on the given
+ * vdev else, don't allow roam invoke to be triggered.
+ * @mac_handle: Opaque mac handle
+ * @vdev_id: vdev_id
+ *
+ * This API should return true if kernel version is less than 4.9, because
+ * the earlier versions don't have the fix to handle reassociation failure.
+ *
+ * Return: true if roaming module initialization is done else false
+ */
+static bool
+hdd_is_fast_reassoc_allowed(mac_handle_t mac_handle, uint8_t vdev_id)
+{
+	return sme_is_fast_reassoc_allowed(mac_handle, vdev_id);
+}
+#else
+static inline bool
+hdd_is_fast_reassoc_allowed(mac_handle_t mac_handle, uint8_t vdev_id)
+{
+	return true;
+}
+#endif
+
 /**
  * hdd_reassoc() - perform a userspace-directed reassoc
  * @adapter:    Adapter upon which the command was received
@@ -900,6 +926,13 @@ int hdd_reassoc(struct hdd_adapter *adapter, const uint8_t *bssid,
 
 	/* Proceed with reassoc */
 	if (roaming_offload_enabled(hdd_ctx)) {
+		if (!hdd_is_fast_reassoc_allowed(adapter->hdd_ctx->mac_handle,
+						 adapter->session_id)) {
+			hdd_err("LFR3: vdev[%d] RSO is not enabled",
+				adapter->session_id);
+			ret = -EPERM;
+			goto exit;
+		}
 		status = hdd_wma_send_fastreassoc_cmd(adapter,
 						      bssid, (int)channel);
 		if (status != QDF_STATUS_SUCCESS) {
@@ -1400,12 +1433,10 @@ hdd_parse_channellist(const uint8_t *pValue, uint8_t *pChannelList,
 		inPtr = strpbrk(inPtr, " ");
 		/* no channel list after the number of channels argument */
 		if (NULL == inPtr) {
-			if (0 != j) {
-				*pNumChannels = j;
+			if ((j != 0) && (j == *pNumChannels))
 				return 0;
-			} else {
-				return -EINVAL;
-			}
+			else
+				goto cnt_mismatch;
 		}
 
 		/* remove empty space */
@@ -1417,12 +1448,10 @@ hdd_parse_channellist(const uint8_t *pValue, uint8_t *pChannelList,
 		 * argument and spaces
 		 */
 		if ('\0' == *inPtr) {
-			if (0 != j) {
-				*pNumChannels = j;
+			if ((j != 0) && (j == *pNumChannels))
 				return 0;
-			} else {
-				return -EINVAL;
-			}
+			else
+				goto cnt_mismatch;
 		}
 
 		v = sscanf(inPtr, "%31s ", buf);
@@ -1442,6 +1471,11 @@ hdd_parse_channellist(const uint8_t *pValue, uint8_t *pChannelList,
 	}
 
 	return 0;
+
+cnt_mismatch:
+	hdd_debug("Mismatch in ch cnt: %d and num of ch: %d", *pNumChannels, j);
+	*pNumChannels = 0;
+	return -EINVAL;
 }
 
 /**
@@ -2271,9 +2305,12 @@ static int hdd_parse_setmaxtxpower_command(uint8_t *pValue, int *pTxPower)
 	return 0;
 } /* End of hdd_parse_setmaxtxpower_command */
 
-static int hdd_get_dwell_time(struct hdd_config *pCfg, uint8_t *command,
+static int hdd_get_dwell_time(struct hdd_context *hdd_ctx,  uint8_t *command,
 			      char *extra, uint8_t n, uint8_t *len)
 {
+	uint32_t val = 0;
+	struct hdd_config *pCfg = hdd_ctx->config;
+
 	if (!pCfg || !command || !extra || !len) {
 		hdd_err("argument passed for GETDWELLTIME is incorrect");
 		return -EINVAL;
@@ -2299,6 +2336,12 @@ static int hdd_get_dwell_time(struct hdd_config *pCfg, uint8_t *command,
 				 (int)pCfg->nPassiveMinChnTime);
 		return 0;
 	}
+	if (strncmp(command, "GETDWELLTIME 2G MAX", 19) == 0) {
+		ucfg_scan_cfg_get_active_2g_dwelltime(hdd_ctx->psoc, &val);
+		*len = scnprintf(extra, n, "GETDWELLTIME 2G MAX %u\n",
+				 val);
+		return 0;
+	}
 	if (strncmp(command, "GETDWELLTIME", 12) == 0) {
 		*len = scnprintf(extra, n, "GETDWELLTIME %u\n",
 				 (int)pCfg->nActiveMaxChnTime);
@@ -2311,6 +2354,7 @@ static int hdd_get_dwell_time(struct hdd_config *pCfg, uint8_t *command,
 static int hdd_set_dwell_time(struct hdd_adapter *adapter, uint8_t *command)
 {
 	mac_handle_t mac_handle = hdd_adapter_get_mac_handle(adapter);
+	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
 	struct hdd_config *pCfg;
 	uint8_t *value = command;
 	tSmeConfigParams *sme_config;
@@ -2322,6 +2366,10 @@ static int hdd_set_dwell_time(struct hdd_adapter *adapter, uint8_t *command)
 		hdd_err("argument passed for SETDWELLTIME is incorrect");
 		return -EINVAL;
 	}
+
+	retval = wlan_hdd_validate_context(hdd_ctx);
+	if (retval)
+		return retval;
 
 	sme_config = qdf_mem_malloc(sizeof(*sme_config));
 	if (!sme_config) {
@@ -2347,6 +2395,7 @@ static int hdd_set_dwell_time(struct hdd_adapter *adapter, uint8_t *command)
 		pCfg->nActiveMaxChnTime = val;
 		sme_config->csrConfig.nActiveMaxChnTime = val;
 		sme_update_config(mac_handle, sme_config);
+		ucfg_scan_cfg_set_active_dwelltime(hdd_ctx->psoc, val);
 	} else if (strncmp(command, "SETDWELLTIME ACTIVE MIN", 23) == 0) {
 		if (drv_cmd_validate(command, 23)) {
 			retval = -EINVAL;
@@ -2381,6 +2430,7 @@ static int hdd_set_dwell_time(struct hdd_adapter *adapter, uint8_t *command)
 		pCfg->nPassiveMaxChnTime = val;
 		sme_config->csrConfig.nPassiveMaxChnTime = val;
 		sme_update_config(mac_handle, sme_config);
+		ucfg_scan_cfg_set_passive_dwelltime(hdd_ctx->psoc, val);
 	} else if (strncmp(command, "SETDWELLTIME PASSIVE MIN", 24) == 0) {
 		if (drv_cmd_validate(command, 24)) {
 			retval = -EINVAL;
@@ -2398,7 +2448,21 @@ static int hdd_set_dwell_time(struct hdd_adapter *adapter, uint8_t *command)
 		pCfg->nPassiveMinChnTime = val;
 		sme_config->csrConfig.nPassiveMinChnTime = val;
 		sme_update_config(mac_handle, sme_config);
-	} else if (strncmp(command, "SETDWELLTIME", 12) == 0) {
+	} else if (strncmp(command, "SETDWELLTIME 2G MAX", 19) == 0) {
+		if (drv_cmd_validate(command, 19)) {
+			retval = -EINVAL;
+			goto free;
+		}
+
+		value = value + 20;
+		temp = kstrtou32(value, 10, &val);
+		if (temp ||  val < CFG_ACTIVE_MAX_2G_CHANNEL_TIME_MIN ||
+		    val > CFG_ACTIVE_MAX_2G_CHANNEL_TIME_MAX) {
+			hdd_err_rl("argument passed for SETDWELLTIME 2G MAX is incorrect");
+			return -EFAULT;
+		}
+		ucfg_scan_cfg_set_active_2g_dwelltime(hdd_ctx->psoc, val);
+	}  else if (strncmp(command, "SETDWELLTIME", 12) == 0) {
 		if (drv_cmd_validate(command, 12)) {
 			retval = -EINVAL;
 			goto free;
@@ -2415,6 +2479,7 @@ static int hdd_set_dwell_time(struct hdd_adapter *adapter, uint8_t *command)
 		pCfg->nActiveMaxChnTime = val;
 		sme_config->csrConfig.nActiveMaxChnTime = val;
 		sme_update_config(mac_handle, sme_config);
+		ucfg_scan_cfg_set_active_dwelltime(hdd_ctx->psoc, val);
 	} else {
 		retval = -EINVAL;
 		goto free;
@@ -2486,6 +2551,8 @@ static int hdd_conc_set_dwell_time(struct hdd_adapter *adapter,
 		p_cfg->nActiveMaxChnTimeConc = val;
 		sme_config->csrConfig.nActiveMaxChnTimeConc = val;
 		sme_update_config(mac_handle, sme_config);
+		ucfg_scan_cfg_set_conc_active_dwelltime(
+				(WLAN_HDD_GET_CTX(adapter))->psoc, val);
 	} else if (strncmp(command, "CONCSETDWELLTIME ACTIVE MIN", 27) == 0) {
 		if (drv_cmd_validate(command, 27)) {
 			hdd_err("Invalid driver command");
@@ -2524,6 +2591,8 @@ static int hdd_conc_set_dwell_time(struct hdd_adapter *adapter,
 		p_cfg->nPassiveMaxChnTimeConc = val;
 		sme_config->csrConfig.nPassiveMaxChnTimeConc = val;
 		sme_update_config(mac_handle, sme_config);
+		ucfg_scan_cfg_set_conc_passive_dwelltime(
+				(WLAN_HDD_GET_CTX(adapter))->psoc, val);
 	} else if (strncmp(command, "CONCSETDWELLTIME PASSIVE MIN", 28) == 0) {
 		if (drv_cmd_validate(command, 28)) {
 			hdd_err("Invalid driver command");
@@ -3754,6 +3823,145 @@ static int drv_cmd_set_roam_scan_channels(struct hdd_adapter *adapter,
 	return hdd_parse_set_roam_scan_channels(adapter, command);
 }
 
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+static bool is_roam_ch_from_fw_supported(struct hdd_context *hdd_ctx)
+{
+	return hdd_ctx->roam_ch_from_fw_supported;
+}
+
+struct roam_ch_priv {
+	struct roam_scan_ch_resp roam_ch;
+};
+
+void hdd_get_roam_scan_ch_cb(hdd_handle_t hdd_handle,
+			     struct roam_scan_ch_resp *roam_ch,
+			     void *context)
+{
+	struct osif_request *request;
+	struct roam_ch_priv *priv;
+	uint8_t *event = NULL, i = 0;
+	uint32_t  *freq = NULL, len;
+	struct hdd_context *hdd_ctx = hdd_handle_to_context(hdd_handle);
+
+	hdd_debug("roam scan ch list event received : vdev_id:%d command resp: %d",
+		  roam_ch->vdev_id, roam_ch->command_resp);
+	/**
+	 * If command response is set in the response message, then it is
+	 * getroamscanchannels command response else this event is asyncronous
+	 * event raised by firmware.
+	 */
+	if (!roam_ch->command_resp) {
+		len = roam_ch->num_channels * sizeof(roam_ch->chan_list[0]);
+		if (!len) {
+			hdd_err("Invalid len");
+			return;
+		}
+		event = (uint8_t *)qdf_mem_malloc(len);
+		if (!event) {
+			hdd_err("Failed to alloc event response buf vdev_id: %d",
+				roam_ch->vdev_id);
+			return;
+		}
+		freq = (uint32_t *)event;
+		for (i = 0; i < roam_ch->num_channels &&
+		     i < WNI_CFG_VALID_CHANNEL_LIST_LEN; i++) {
+			freq[i] = roam_ch->chan_list[i];
+		}
+
+		hdd_send_roam_scan_ch_list_event(hdd_ctx, roam_ch->vdev_id,
+						 len, event);
+		qdf_mem_free(event);
+		return;
+	}
+
+	request = osif_request_get(context);
+	if (!request) {
+		hdd_err("Obsolete request");
+		return;
+	}
+	priv = osif_request_priv(request);
+
+	priv->roam_ch.num_channels = roam_ch->num_channels;
+	for (i = 0; i < priv->roam_ch.num_channels &&
+	     i < WNI_CFG_VALID_CHANNEL_LIST_LEN; i++)
+		priv->roam_ch.chan_list[i] = roam_ch->chan_list[i];
+
+	osif_request_complete(request);
+	osif_request_put(request);
+}
+
+static uint32_t
+hdd_get_roam_chan_from_fw(struct hdd_adapter *adapter,
+			  uint8_t *chan_list, uint8_t *num_channels)
+{
+	QDF_STATUS status = QDF_STATUS_E_INVAL;
+	struct hdd_context *hdd_ctx;
+	int ret, i;
+	void *cookie;
+	struct osif_request *request;
+	struct roam_ch_priv *priv;
+	struct roam_scan_ch_resp *p_roam_ch;
+	struct hdd_station_ctx *hdd_sta_ctx;
+	static const struct osif_request_params params = {
+			.priv_size = sizeof(*priv) +
+				     sizeof(priv->roam_ch.chan_list[0]) *
+				     WNI_CFG_VALID_CHANNEL_LIST_LEN,
+			.timeout_ms = WLAN_WAIT_TIME_STATS,
+	};
+
+	hdd_ctx = WLAN_HDD_GET_CTX(adapter);
+	hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
+	request = osif_request_alloc(&params);
+	if (!request) {
+		hdd_err("Request allocation failure");
+		return -ENOMEM;
+	}
+
+	priv = osif_request_priv(request);
+	p_roam_ch = &priv->roam_ch;
+	/** channel list starts after response structure*/
+	priv->roam_ch.chan_list = (uint32_t *)(p_roam_ch + 1);
+	cookie = osif_request_cookie(request);
+	status = sme_get_roam_scan_ch(hdd_ctx->mac_handle,
+				      adapter->session_id, cookie);
+
+	if (QDF_IS_STATUS_ERROR(status)) {
+		hdd_err("Unable to retrieve roam channels");
+		ret = qdf_status_to_os_return(status);
+		goto cleanup;
+	}
+
+	ret = osif_request_wait_for_response(request);
+	if (ret) {
+		hdd_err("SME timed out while retrieving raom channels");
+		goto cleanup;
+	}
+
+	*num_channels = priv->roam_ch.num_channels;
+	for (i = 0; i < *num_channels &&
+	     i < WNI_CFG_VALID_CHANNEL_LIST_LEN; i++)
+		chan_list[i] = wlan_reg_freq_to_chan(
+				hdd_ctx->pdev, priv->roam_ch.chan_list[i]);
+
+cleanup:
+	osif_request_put(request);
+
+	return ret;
+}
+#else
+static bool is_roam_ch_from_fw_supported(struct hdd_context *hdd_ctx)
+{
+	return false;
+}
+
+static uint32_t
+hdd_get_roam_chan_from_fw(struct hdd_adapter *adapter,
+			  uint8_t *chan_list, uint8_t *num_channels)
+{
+	return QDF_STATUS_E_INVAL;
+}
+#endif
+
 static int drv_cmd_get_roam_scan_channels(struct hdd_adapter *adapter,
 					  struct hdd_context *hdd_ctx,
 					  uint8_t *command,
@@ -3767,6 +3975,18 @@ static int drv_cmd_get_roam_scan_channels(struct hdd_adapter *adapter,
 	char extra[128] = { 0 };
 	int len;
 
+	if (is_roam_ch_from_fw_supported(hdd_ctx)) {
+		ret = hdd_get_roam_chan_from_fw(adapter, ChannelList,
+						&numChannels);
+		if (ret == QDF_STATUS_SUCCESS) {
+			goto fill_ch_resp;
+		} else {
+			hdd_err("failed to get roam scan channel list from FW");
+			ret = -EFAULT;
+			goto exit;
+		}
+	}
+
 	if (QDF_STATUS_SUCCESS !=
 		sme_get_roam_scan_channel_list(hdd_ctx->mac_handle,
 					       ChannelList,
@@ -3777,6 +3997,7 @@ static int drv_cmd_get_roam_scan_channels(struct hdd_adapter *adapter,
 		goto exit;
 	}
 
+fill_ch_resp:
 	qdf_mtrace(QDF_MODULE_ID_HDD, QDF_MODULE_ID_HDD,
 		   TRACE_CODE_HDD_GETROAMSCANCHANNELS_IOCTL,
 		   adapter->session_id, numChannels);
@@ -4375,7 +4596,7 @@ static int drv_cmd_get_scan_home_away_time(struct hdd_adapter *adapter,
 {
 	int ret = 0;
 	uint16_t val;
-	char extra[32];
+	char extra[32] = {0};
 	uint8_t len = 0;
 	QDF_STATUS status;
 
@@ -4387,7 +4608,6 @@ static int drv_cmd_get_scan_home_away_time(struct hdd_adapter *adapter,
 
 	hdd_debug("vdev_id: %u, scan home away time: %u",
 		  adapter->session_id, val);
-
 	len = scnprintf(extra, sizeof(extra), "%s %d", command, val);
 	len = QDF_MIN(priv_data->total_len, len + 1);
 
@@ -4953,13 +5173,11 @@ static int drv_cmd_get_dwell_time(struct hdd_adapter *adapter,
 				  struct hdd_priv_data *priv_data)
 {
 	int ret = 0;
-	struct hdd_config *pCfg =
-		(WLAN_HDD_GET_CTX(adapter))->config;
 	char extra[32];
 	uint8_t len = 0;
 
 	memset(extra, 0, sizeof(extra));
-	ret = hdd_get_dwell_time(pCfg, command, extra, sizeof(extra), &len);
+	ret = hdd_get_dwell_time(hdd_ctx, command, extra, sizeof(extra), &len);
 	len = QDF_MIN(priv_data->total_len, len + 1);
 	if (ret != 0 || copy_to_user(priv_data->buf, &extra, len)) {
 		hdd_err("failed to copy data to user buffer");
@@ -6582,7 +6800,7 @@ static int hdd_driver_rxfilter_command_handler(uint8_t *command,
 		ret = hdd_set_rx_filter(adapter, action, 0x01);
 		break;
 	default:
-		hdd_warn("Unsupported RXFILTER type %d", type);
+		hdd_debug("Unsupported RXFILTER type %d", type);
 		break;
 	}
 
@@ -7495,7 +7713,8 @@ mem_alloc_failed:
 	/* Disable the channels received in command SET_DISABLE_CHANNEL_LIST */
 	if (!is_command_repeated && hdd_ctx->original_channels) {
 		wlan_hdd_disable_channels(hdd_ctx);
-		hdd_check_and_disconnect_sta_on_invalid_channel(hdd_ctx);
+		hdd_check_and_disconnect_sta_on_invalid_channel(hdd_ctx,
+			eSIR_MAC_OPER_CHANNEL_USER_DISABLED);
 	}
 
 	hdd_exit();
@@ -7774,6 +7993,69 @@ static int drv_cmd_get_ani_level(struct hdd_adapter *adapter,
 	return 0;
 }
 #endif
+
+#ifdef FUNC_CALL_MAP
+static int drv_cmd_get_function_call_map(struct hdd_adapter *adapter,
+					 struct hdd_context *hdd_ctx,
+					 uint8_t *command,
+					 uint8_t command_len,
+					 struct hdd_priv_data *priv_data)
+{
+	char *cc_buf = qdf_mem_malloc(QDF_FUNCTION_CALL_MAP_BUF_LEN);
+	uint8_t *param;
+	int temp_int;
+
+	param = strnchr(command, strlen(command), ' ');
+	/*no argument after the command*/
+	if (NULL == param)
+		return -EINVAL;
+
+	/*no space after the command*/
+	else if (SPACE_ASCII_VALUE != *param)
+		return -EINVAL;
+
+	param++;
+
+	/*removing empty spaces*/
+	while ((SPACE_ASCII_VALUE  == *param) && ('\0' !=  *param))
+		param++;
+
+	/*no argument followed by spaces*/
+	if ('\0' == *param)
+		return -EINVAL;
+
+	/*getting the first argument */
+	if (sscanf(param, "%d ", &temp_int) != 1) {
+		hdd_err("No option given");
+		return -EINVAL;
+	}
+
+	if (temp_int < 0 || temp_int > 1) {
+		hdd_err("Invalid option given");
+		return -EINVAL;
+	}
+
+	/* Read the buffer */
+	if (temp_int) {
+	/*
+	 * These logs are required as these indicates the start and end of the
+	 * dump for the auto script to parse
+	 */
+		hdd_info("Function call map dump start");
+		qdf_get_func_call_map(cc_buf);
+		qdf_trace_hex_dump(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
+				   cc_buf, QDF_FUNCTION_CALL_MAP_BUF_LEN);
+		hdd_info("Function call map dump end");
+	} else {
+		qdf_clear_func_call_map();
+		hdd_info("Function call map clear");
+	}
+	qdf_mem_free(cc_buf);
+
+	return 0;
+}
+#endif
+
 /*
  * The following table contains all supported WLAN HDD
  * IOCTL driver commands and the handler for each of them.
@@ -7888,6 +8170,9 @@ static const struct hdd_drv_cmd hdd_drv_cmds[] = {
 	{"SET_DISABLE_CHANNEL_LIST",  drv_cmd_set_disable_chan_list, true},
 	{"GET_DISABLE_CHANNEL_LIST",  drv_cmd_get_disable_chan_list, false},
 	{"GET_ANI_LEVEL",             drv_cmd_get_ani_level, false},
+#ifdef FUNC_CALL_MAP
+	{"GET_FUNCTION_CALL_MAP",     drv_cmd_get_function_call_map, true},
+#endif
 	{"STOP",                      drv_cmd_dummy, false},
 	/* Deprecated commands */
 	{"RXFILTER-START",            drv_cmd_dummy, false},

@@ -127,15 +127,14 @@ int find_ie_location(tpAniSirGlobal pMac, tpSirRSNie pRsnIe, uint8_t EID)
 	bytesLeft = pRsnIe->length;
 
 	while (1) {
-		if (EID == pRsnIe->rsnIEdata[idx]) {
+		if (EID == pRsnIe->rsnIEdata[idx])
 			/* Found it */
 			return idx;
-		} else if (EID != pRsnIe->rsnIEdata[idx] &&
-			/* & if no more IE, */
-			   bytesLeft <= (uint16_t) (ieLen)) {
-			pe_debug("No IE (%d) in find_ie_location", EID);
+		if (EID != pRsnIe->rsnIEdata[idx] &&
+		    /* & if no more IE, */
+		    bytesLeft <= (uint16_t) (ieLen))
 			return ret_val;
-		}
+
 		bytesLeft -= ieLen;
 		ieLen = pRsnIe->rsnIEdata[idx + 1] + 2;
 		idx += ieLen;
@@ -675,8 +674,6 @@ populate_dot11f_ht_caps(tpAniSirGlobal pMac,
 	if (psessionEntry) {
 		disable_high_ht_mcs_2x2 =
 				pMac->roam.configParam.disable_high_ht_mcs_2x2;
-		pe_debug("disable HT high MCS INI param[%d]",
-			 disable_high_ht_mcs_2x2);
 		if (psessionEntry->nss == NSS_1x1_MODE) {
 			pDot11f->supportedMCSSet[1] = 0;
 		} else if (IS_24G_CH(psessionEntry->currentOperChannel) &&
@@ -851,18 +848,15 @@ static void lim_log_qos_map_set(tpAniSirGlobal pMac, tSirQosMapSet *pQosMapSet)
 
 	pe_debug("num of dscp exceptions: %d",
 		pQosMapSet->num_dscp_exceptions);
-	for (i = 0; i < pQosMapSet->num_dscp_exceptions; i++) {
-		pe_debug("dscp value: %d",
-			pQosMapSet->dscp_exceptions[i][0]);
-		pe_debug("User priority value: %d",
-			pQosMapSet->dscp_exceptions[i][1]);
-	}
-	for (i = 0; i < 8; i++) {
-		pe_debug("dscp low for up %d: %d", i,
-			pQosMapSet->dscp_range[i][0]);
-		pe_debug("dscp high for up %d: %d", i,
-			pQosMapSet->dscp_range[i][1]);
-	}
+	for (i = 0; i < pQosMapSet->num_dscp_exceptions; i++)
+		pe_nofl_debug("dscp value: %d, User priority value: %d",
+			      pQosMapSet->dscp_exceptions[i][0],
+			      pQosMapSet->dscp_exceptions[i][1]);
+
+	for (i = 0; i < 8; i++)
+		pe_nofl_debug("For up %d: dscp low: %d, dscp high: %d", i,
+			       pQosMapSet->dscp_range[i][0],
+			       pQosMapSet->dscp_range[i][1]);
 }
 
 QDF_STATUS
@@ -1174,13 +1168,10 @@ populate_dot11f_ext_cap(tpAniSirGlobal pMac,
 		pe_debug("11MC support enabled");
 		pDot11f->num_bytes = DOT11F_IE_EXTCAP_MAX_LEN;
 	} else {
-		if (eLIM_AP_ROLE != psessionEntry->limSystemRole) {
-			pe_debug("11MC support enabled");
+		if (eLIM_AP_ROLE != psessionEntry->limSystemRole)
 			pDot11f->num_bytes = DOT11F_IE_EXTCAP_MAX_LEN;
-		} else  {
-			pe_debug("11MC support disabled");
+		else
 			pDot11f->num_bytes = DOT11F_IE_EXTCAP_MIN_LEN;
-		}
 	}
 
 	p_ext_cap = (struct s_ext_cap *)pDot11f->bytes;
@@ -3089,12 +3080,16 @@ QDF_STATUS wlan_parse_ftie_sha384(uint8_t *frame, uint32_t frame_len,
 QDF_STATUS
 sir_convert_assoc_resp_frame2_struct(tpAniSirGlobal pMac,
 		tpPESession session_entry,
-		uint8_t *pFrame, uint32_t nFrame,
+		u8 *frame, u32 frame_len,
 		tpSirAssocRsp pAssocRsp)
 {
 	tDot11fAssocResponse *ar;
-	uint32_t status;
+	enum ani_akm_type auth_type;
+	u32 status, ie_len;
+	QDF_STATUS qdf_status;
 	uint8_t cnt = 0;
+	bool sha384_akm;
+	u8 *ie_ptr;
 
 	ar = qdf_mem_malloc(sizeof(*ar));
 	if (!ar) {
@@ -3105,7 +3100,7 @@ sir_convert_assoc_resp_frame2_struct(tpAniSirGlobal pMac,
 	/* decrypt the cipher text using AEAD decryption */
 	if (lim_is_fils_connection(session_entry)) {
 		status = aead_decrypt_assoc_rsp(pMac, session_entry,
-						ar, pFrame, &nFrame);
+						ar, frame, &frame_len);
 		if (!QDF_IS_STATUS_SUCCESS(status)) {
 			pe_err("FILS assoc rsp AEAD decrypt fails");
 			qdf_mem_free(ar);
@@ -3113,12 +3108,11 @@ sir_convert_assoc_resp_frame2_struct(tpAniSirGlobal pMac,
 		}
 	}
 
-	status = dot11f_parse_assoc_response(pMac, pFrame, nFrame, ar, false);
+	status = dot11f_parse_assoc_response(pMac, frame, frame_len, ar, false);
 	if (QDF_STATUS_SUCCESS != status) {
 		qdf_mem_free(ar);
 		return status;
 	}
-
 
 	/* Capabilities */
 	pAssocRsp->capabilityInfo.ess = ar->Capabilities.ess;
@@ -3204,13 +3198,40 @@ sir_convert_assoc_resp_frame2_struct(tpAniSirGlobal pMac,
 			(unsigned int)pAssocRsp->mdie[2]);
 	}
 
-	if (ar->FTInfo.present) {
-		pe_debug("FT Info present %d %d %d",
-			ar->FTInfo.R0KH_ID.num_PMK_R0_ID,
-			ar->FTInfo.R0KH_ID.present, ar->FTInfo.R1KH_ID.present);
+	/*
+	 * If the connection is based on SHA384 AKM suite,
+	 * then the length of MIC is 24 bytes, but frame parser
+	 * has FTIE MIC of 16 bytes only. This results in parsing FTIE
+	 * failure and R0KH and R1KH are not sent to firmware over RSO
+	 * command. Frame parser doesn't have
+	 * info on the connected AKM. So parse the FTIE again if
+	 * AKM is sha384 based and extract the R0KH and R1KH using the new
+	 * parsing logic.
+	 */
+	auth_type = session_entry->connected_akm;
+	sha384_akm = lim_is_sha384_akm(auth_type);
+	if (sha384_akm) {
+		ie_ptr = frame + FIXED_PARAM_OFFSET_ASSOC_RSP;
+		ie_len = frame_len - FIXED_PARAM_OFFSET_ASSOC_RSP;
+		qdf_status = wlan_parse_ftie_sha384(ie_ptr, ie_len, pAssocRsp);
+		if (QDF_IS_STATUS_ERROR(qdf_status)) {
+			pe_err("FT IE parsing failed status:%d", status);
+		} else {
+			pe_debug("FT: R0KH present:%d len:%d R1KH present%d",
+				 pAssocRsp->sha384_ft_subelem.r0kh_id.present,
+				 pAssocRsp->
+				 sha384_ft_subelem.r0kh_id.num_PMK_R0_ID,
+				 pAssocRsp->sha384_ft_subelem.r1kh_id.present);
+			ar->FTInfo.present = false;
+		}
+	} else if (ar->FTInfo.present) {
+		pe_debug("FT: R0KH present:%d, len:%d R1KH present:%d",
+			 ar->FTInfo.R0KH_ID.present,
+			 ar->FTInfo.R0KH_ID.num_PMK_R0_ID,
+			 ar->FTInfo.R1KH_ID.present);
 		pAssocRsp->ftinfoPresent = 1;
 		qdf_mem_copy(&pAssocRsp->FTInfo, &ar->FTInfo,
-				sizeof(tDot11fIEFTInfo));
+			     sizeof(tDot11fIEFTInfo));
 	}
 
 	if (ar->num_RICDataDesc && ar->num_RICDataDesc <= 2) {
@@ -3839,8 +3860,7 @@ sir_parse_beacon_ie(tpAniSirGlobal pMac,
 		qdf_mem_free(pBies);
 		return QDF_STATUS_E_FAILURE;
 	} else if (DOT11F_WARNED(status)) {
-		pe_debug("There were warnings while unpacking Beacon IEs (0x%08x, %d bytes):",
-			status, nPayload);
+		pe_debug("warnings (0x%08x, %d bytes):", status, nPayload);
 	}
 	/* & "transliterate" from a 'tDot11fBeaconIEs' to a 'tSirProbeRespBeacon'... */
 	if (!pBies->SSID.present) {
@@ -6546,8 +6566,6 @@ QDF_STATUS populate_dot11f_he_caps(tpAniSirGlobal mac_ctx, tpPESession session,
 	} else {
 		he_cap->ppet.ppe_threshold.num_ppe_th = 0;
 	}
-
-	lim_log_he_cap(mac_ctx, he_cap);
 
 	return QDF_STATUS_SUCCESS;
 }

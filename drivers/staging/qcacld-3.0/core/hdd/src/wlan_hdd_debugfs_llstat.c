@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2018, 2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -286,6 +286,17 @@ void hdd_debugfs_process_radio_stats(struct hdd_adapter *adapter,
 				chan_stat->channel.centerFreq0,
 				chan_stat->channel.centerFreq1,
 				chan_stat->onTime, chan_stat->ccaBusyTime);
+
+			if (adapter->hdd_ctx &&
+			    adapter->hdd_ctx->ll_stats_per_chan_rx_tx_time) {
+				buffer += len;
+				ll_stats.len += len;
+				len = scnprintf(
+					buffer,
+					DEBUGFS_LLSTATS_BUF_SIZE - ll_stats.len,
+					", tx_time: %u, rx_time: %u",
+					chan_stat->tx_time, chan_stat->rx_time);
+			}
 		}
 
 		radio_stat++;
@@ -387,7 +398,7 @@ static ssize_t __wlan_hdd_read_ll_stats_debugfs(struct file *file,
 
 	/* All the events are received and buffer is populated */
 	ret = hdd_debugfs_stats_update(buf, count, pos);
-	hdd_info("%zu characters written into debugfs", ret);
+	hdd_debug("%zu characters written into debugfs", ret);
 
 	hdd_exit();
 	return ret;

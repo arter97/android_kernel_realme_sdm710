@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2018, 2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -349,7 +349,16 @@ typedef struct tagSmeStruct {
 #endif
 #ifdef FEATURE_OEM_DATA
 	void (*oem_data_event_handler_cb)
-			(const struct oem_data *oem_event_data);
+			(const struct oem_data *oem_event_data,
+			 uint8_t vdev_id);
+	uint8_t oem_data_vdev_id;
+#endif
+#ifdef WLAN_FEATURE_ROAM_OFFLOAD
+	sme_get_raom_scan_ch_Callback roam_scan_ch_callback;
+	void *roam_scan_ch_get_context;
+#endif
+#if defined(CLD_PM_QOS) && defined(WLAN_FEATURE_LL_MODE)
+	void (*beacon_latency_event_cb)(uint32_t latency_level);
 #endif
 } tSmeStruct, *tpSmeStruct;
 

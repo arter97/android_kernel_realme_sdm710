@@ -77,6 +77,7 @@
 #include "wlan_lmac_if_api.h"
 #include <wlan_cp_stats_mc_ucfg_api.h>
 #include <wlan_mlme_main.h>
+#include "wlan_pkt_capture_ucfg_api.h"
 
 struct wma_search_rate {
 	int32_t rate;
@@ -765,6 +766,28 @@ static void wma_cp_stats_set_rate_flag(tp_wma_handle wma, uint8_t vdev_id) {}
  *
  * Return: none
  */
+
+
+enum tx_rate_info wma_get_vht_rate_flags(enum phy_ch_width ch_width)
+{
+	enum tx_rate_info rate_flags = 0;
+
+	if (ch_width == CH_WIDTH_80P80MHZ)
+		rate_flags |= TX_RATE_VHT80 | TX_RATE_VHT40 | TX_RATE_VHT20;
+	if (ch_width == CH_WIDTH_160MHZ)
+		rate_flags |= TX_RATE_VHT80 | TX_RATE_VHT40 | TX_RATE_VHT20;
+	if (ch_width == CH_WIDTH_80MHZ)
+		rate_flags |= TX_RATE_VHT80 | TX_RATE_VHT40 | TX_RATE_VHT20;
+	else if (ch_width)
+		rate_flags |= TX_RATE_VHT40 | TX_RATE_VHT20;
+	else
+		rate_flags |= TX_RATE_VHT20;
+
+	return rate_flags;
+}
+
+
+
 void wma_set_bss_rate_flags(tp_wma_handle wma, uint8_t vdev_id,
 			    tpAddBssParams add_bss)
 {
@@ -772,16 +795,7 @@ void wma_set_bss_rate_flags(tp_wma_handle wma, uint8_t vdev_id,
 
 	iface->rate_flags = 0;
 	if (add_bss->vhtCapable) {
-		if (add_bss->ch_width == CH_WIDTH_80P80MHZ)
-			iface->rate_flags |= TX_RATE_VHT80;
-		if (add_bss->ch_width == CH_WIDTH_160MHZ)
-			iface->rate_flags |= TX_RATE_VHT80;
-		if (add_bss->ch_width == CH_WIDTH_80MHZ)
-			iface->rate_flags |= TX_RATE_VHT80;
-		else if (add_bss->ch_width)
-			iface->rate_flags |= TX_RATE_VHT40;
-		else
-			iface->rate_flags |= TX_RATE_VHT20;
+		iface->rate_flags = wma_get_vht_rate_flags(add_bss->ch_width);
 	}
 	/* avoid to conflict with htCapable flag */
 	else if (add_bss->htCapable) {
@@ -1195,8 +1209,6 @@ void wma_set_linkstate(tp_wma_handle wma, tpLinkStateParams params)
 		 params->state, params->selfMacAddr);
 	if ((params->state != eSIR_LINK_PREASSOC_STATE) &&
 	    (params->state != eSIR_LINK_DOWN_STATE)) {
-		WMA_LOGD("%s: unsupported link state %d",
-			 __func__, params->state);
 		params->status = false;
 		goto out;
 	}
@@ -2744,7 +2756,9 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 	} else {
 		chanfreq = 0;
 	}
+
 	if (pMac->fEnableDebugLog & 0x1) {
+
 		if ((pFc->type == SIR_MAC_MGMT_FRAME) &&
 		    (pFc->subType != SIR_MAC_MGMT_PROBE_REQ) &&
 		    (pFc->subType != SIR_MAC_MGMT_PROBE_RSP)) {
@@ -2797,6 +2811,13 @@ QDF_STATUS wma_tx_packet(void *wma_context, void *tx_frame, uint16_t frmLen,
 		mac_addr = wh->i_addr2;
 		peer = wlan_objmgr_get_peer(psoc, pdev_id, mac_addr,
 					WLAN_MGMT_NB_ID);
+	}
+
+	if (ucfg_pkt_capture_get_pktcap_mode() & PKT_CAPTURE_MODE_MGMT_ONLY) {
+		ucfg_pkt_capture_mgmt_tx(wma_handle->pdev,
+					 tx_frame,
+					 wma_handle->interfaces[vdev_id].mhz,
+					 mgmt_param.tx_param.preamble_type);
 	}
 
 	status = wlan_mgmt_txrx_mgmt_frame_tx(peer, wma_handle->mac_context,
